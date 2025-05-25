@@ -470,17 +470,23 @@ class GameState
                 this.drawTwoAmount += 2;
                 this.isDrawTwoActive = true;
                 gameUI.showMessage(`Draw stack is now ${this.drawTwoAmount}`);
+                // Normal turn rotation occurs at end of playCard function
                 break;
             case Rank.Ace:  // Change Direction
                 this.isReversed = !this.isReversed;
+                // Normal turn rotation occurs at end of playCard function
                 break;
             case Rank.Queen:  // Skip
                 this.nextTurn(); // Skip next player
+                // Now the playCard function will go to the next player again
                 break;
             case Rank.Eight:  // Change Suit
+                // For Eight cards, we'll handle the turn change after suit selection
                 if (players[this.currentPlayerIndex].isRealPlayer)
                 {
                     suitSelectionUI.show();
+                    // Don't advance turn yet - will be handled in suit selection handler
+                    return false; // Return false to indicate turn shouldn't advance yet
                 } else
                 {
                     // AI chooses the suit it has the most cards of
@@ -505,11 +511,17 @@ class GameState
                     }
 
                     cardView.model.changedSuit = maxSuit;
-                    this.nextTurn();
-                    handleAITurn();
+                    gameUI.showMessage(`AI changed suit to ${maxSuit}!`);
+                    // Handle turn change with delay for AI
+                    setTimeout(() => {
+                        this.nextTurn();
+                        handleAITurn();
+                    }, 500);
+                    return false; // Return false to indicate turn shouldn't advance yet
                 }
                 break;
         }
+        return true; // Return true to indicate normal turn advancement
     }
 
     // Method to resolve Draw Two when drawing
@@ -665,8 +677,13 @@ class SuitSelectionUI
         }
 
         this.hide();
-        gameState.nextTurn();
-        handleAITurn();
+        gameUI.showMessage(`Suit changed to ${suitName}!`);
+        
+        // Delay turn change by 0.5 seconds after suit selection
+        setTimeout(() => {
+            gameState.nextTurn();
+            handleAITurn();
+        }, 500);
     }
 }
 
@@ -757,7 +774,9 @@ function playCard(cardView, player) {
             break;
     }
 
-    gameState.applyCardEffect(cardView);
+    // Apply card effect and check if we should proceed with turn change
+    // Eight card will return false to prevent immediate turn change
+    const shouldAdvanceTurn = gameState.applyCardEffect(cardView);
 
     // Check for win condition
     if (player.cards.length === 0)
@@ -767,11 +786,14 @@ function playCard(cardView, player) {
         return;
     }
 
-    // Move to next turn
-    gameState.nextTurn();
+    // Only advance turn if the card effect allows it (Eight cards handle their own turn change)
+    if (shouldAdvanceTurn) {
+        // Move to next turn
+        gameState.nextTurn();
 
-    // If next player is AI, handle their turn
-    handleAITurn();
+        // If next player is AI, handle their turn
+        handleAITurn();
+    }
 }
 
 // Function to handle AI turns
