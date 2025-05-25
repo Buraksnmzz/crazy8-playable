@@ -173,9 +173,79 @@ class CardViewJS
         }
     }
 
-    // İleride animasyonlu geçişler için metotlar eklenebilir:
-    // moveTo(targetPosition, duration) { /* ... animasyon kodu ... */ }
-    // rotateTo(targetRotation, duration) { /* ... animasyon kodu ... */ }
+    // Smooth animation for card movement
+    moveTo(targetPosition, duration = 0.5)
+    {
+        if (!this.mesh) return;
+
+        const startPosition = this.mesh.position.clone();
+        const startTime = Date.now();
+
+        const animate = () =>
+        {
+            const currentTime = Date.now();
+            const elapsed = (currentTime - startTime) / 1000; // Convert to seconds
+            const progress = Math.min(elapsed / duration, 1);
+
+            if (progress < 1)
+            {
+                // Linear interpolation between start and target positions
+                const newX = startPosition.x + (targetPosition.x - startPosition.x) * progress;
+                const newY = startPosition.y + (targetPosition.y - startPosition.y) * progress;
+                const newZ = startPosition.z + (targetPosition.z - startPosition.z) * progress;
+
+                this.setPosition(newX, newY, newZ);
+
+                requestAnimationFrame(animate);
+            } else
+            {
+                // Ensure we end exactly at target position
+                this.setPosition(targetPosition.x, targetPosition.y, targetPosition.z);
+            }
+        };
+
+        animate();
+    }
+
+    // Smooth animation for card rotation
+    rotateTo(x, y, z, duration = 0.5)
+    {
+        if (!this.mesh) return;
+
+        const startRotation = {
+            x: this.mesh.rotation.x,
+            y: this.mesh.rotation.y,
+            z: this.mesh.rotation.z
+        };
+
+        const targetRotation = { x, y, z };
+        const startTime = Date.now();
+
+        const animate = () =>
+        {
+            const currentTime = Date.now();
+            const elapsed = (currentTime - startTime) / 1000; // Convert to seconds
+            const progress = Math.min(elapsed / duration, 1);
+
+            if (progress < 1)
+            {
+                // Linear interpolation between start and target rotation
+                const newX = startRotation.x + (targetRotation.x - startRotation.x) * progress;
+                const newY = startRotation.y + (targetRotation.y - startRotation.y) * progress;
+                const newZ = startRotation.z + (targetRotation.z - startRotation.z) * progress;
+
+                this.setRotation(newX, newY, newZ);
+
+                requestAnimationFrame(animate);
+            } else
+            {
+                // Ensure we end exactly at target rotation
+                this.setRotation(targetRotation.x, targetRotation.y, targetRotation.z);
+            }
+        };
+
+        animate();
+    }
 }
 
 // Deste Oluşturma
@@ -252,8 +322,23 @@ class Player
 
     addCard(cardView)
     {
+        // Store the original deck position for animation
+        const startPosition = cardView.mesh.position.clone();
+
+        // Add card to player's hand
         this.cards.push(cardView);
+
+        // Calculate the final position using arrangeCards
         this.arrangeCards();
+
+        // Get the current position (updated by arrangeCards)
+        const targetPosition = cardView.mesh.position.clone();
+
+        // Reset to deck position for animation
+        cardView.setPosition(startPosition.x, startPosition.y, startPosition.z);
+
+        // Animate the card from deck to hand
+        cardView.moveTo(targetPosition, 0.5);
     }
 
     arrangeCards()
@@ -513,10 +598,11 @@ class GameState
                     cardView.model.changedSuit = maxSuit;
                     gameUI.showMessage(`AI changed suit to ${maxSuit}!`);
                     // Handle turn change with delay for AI
-                    setTimeout(() => {
+                    setTimeout(() =>
+                    {
                         this.nextTurn();
                         handleAITurn();
-                    }, 500);
+                    }, 700); // Adjusted for new animation speed
                     return false; // Return false to indicate turn shouldn't advance yet
                 }
                 break;
@@ -525,11 +611,14 @@ class GameState
     }
 
     // Method to resolve Draw Two when drawing
-    resolveDrawTwo() {
+    resolveDrawTwo()
+    {
         const player = players[this.currentPlayerIndex];
         // draw cards
-        for (let i = 0; i < this.drawTwoAmount; i++) {
-            if (deck.length > 0) {
+        for (let i = 0; i < this.drawTwoAmount; i++)
+        {
+            if (deck.length > 0)
+            {
                 const card = deck.pop();
                 player.addCard(card);
             }
@@ -678,12 +767,13 @@ class SuitSelectionUI
 
         this.hide();
         gameUI.showMessage(`Suit changed to ${suitName}!`);
-        
-        // Delay turn change by 0.5 seconds after suit selection
-        setTimeout(() => {
+
+        // Delay turn change after suit selection
+        setTimeout(() =>
+        {
             gameState.nextTurn();
             handleAITurn();
-        }, 500);
+        }, 700); // Adjusted for new animation speed
     }
 }
 
@@ -720,7 +810,8 @@ function handleCardClick(cardView)
 }
 
 // Function to play a card
-function playCard(cardView, player) {
+function playCard(cardView, player)
+{
     // Remove card from player's hand
     const cardIndex = player.cards.indexOf(cardView);
     if (cardIndex > -1)
@@ -729,24 +820,32 @@ function playCard(cardView, player) {
         player.arrangeCards();
     }
 
-    // Move card to pile
-    cardView.setPosition(
-        gameConfig.pilePosition.x,
-        gameConfig.pilePosition.y,
-        gameState.pileTopCard ? gameState.pileTopCard.mesh.position.z + 0.01 : 0
-    );
+    // Calculate target z-position to ensure proper stacking
+    const targetZ = gameState.pileTopCard ? gameState.pileTopCard.mesh.position.z + 0.01 : 0;
+
     // Always show front when played
     cardView.showFront();
 
-    // Orient the played card based on which player played it
-    const idx = gameState.currentPlayerIndex;
-    if (idx === 1) {
-        cardView.setRotation(0, 0, Math.PI / 2);
-    } else if (idx === 3) {
-        cardView.setRotation(0, 0, -Math.PI / 2);
-    } else {
-        cardView.setRotation(0, 0, 0);
+    // Add a random rotation between -12 and 12 degrees for a more natural look
+    // First card should have 0 rotation, subsequent cards get random rotation
+    let randomRotation = 0;
+    if (gameState.pileTopCard)
+    { // If there's already a card in the pile
+        randomRotation = Math.random() * 24 - 12; // Random value between -12 and 12
     }
+
+    // Create target position for smooth animation
+    const targetPosition = new THREE.Vector3(
+        gameConfig.pilePosition.x,
+        gameConfig.pilePosition.y,
+        targetZ
+    );
+
+    // Animate card movement to the pile (0.5 seconds duration)
+    cardView.moveTo(targetPosition, 0.5);
+
+    // Animate card rotation (with the random angle)
+    cardView.rotateTo(0, 0, randomRotation * (Math.PI / 180), 0.5);
 
     // Update game state
     gameState.pileTopCard = cardView;
@@ -787,7 +886,8 @@ function playCard(cardView, player) {
     }
 
     // Only advance turn if the card effect allows it (Eight cards handle their own turn change)
-    if (shouldAdvanceTurn) {
+    if (shouldAdvanceTurn)
+    {
         // Move to next turn
         gameState.nextTurn();
 
@@ -806,19 +906,22 @@ function handleAITurn()
         setTimeout(() =>
         {
             // Handle Draw Two effect if active
-            if (gameState.isDrawTwoActive) {
+            if (gameState.isDrawTwoActive)
+            {
                 // Check if AI has a Two card
                 const twoCard = currentPlayer.cards.find(card => card.model.rank === Rank.Two);
-                if (twoCard) {
+                if (twoCard)
+                {
                     // Stack the Two card effect
                     playCard(twoCard, currentPlayer);
-                } else {
+                } else
+                {
                     // No Two card, draw the stacked amount
                     gameState.resolveDrawTwo();
                 }
                 return;
             }
-            
+
             // Normal play logic
             const playableCards = currentPlayer.cards.filter(card => gameState.isCardPlayable(card));
 
@@ -840,21 +943,23 @@ function handleAITurn()
                     if (gameState.isCardPlayable(drawnCard))
                     {
                         // AI always plays the drawn card if it can
-                        setTimeout(() => {
+                        setTimeout(() =>
+                        {
                             gameUI.showMessage(`Player ${gameState.currentPlayerIndex + 1} plays drawn card`);
                             playCard(drawnCard, currentPlayer);
-                        }, 500);
+                        }, 900); // Adjusted for new animation speed
                     } else
                     {
                         // Card is not playable, go to next turn
-                        setTimeout(() => {
+                        setTimeout(() =>
+                        {
                             gameState.nextTurn();
                             handleAITurn();
-                        }, 500);
+                        }, 700); // Adjusted for new animation speed
                     }
                 }
             }
-        }, 1000); // Delay for AI turn
+        }, 1500); // Increased delay for AI turn from 0.5 to 1.5 seconds
     }
 }
 
@@ -884,7 +989,8 @@ function animateInvalidMove(cardView)
 }
 
 // Update click handler to use new game logic and handle deck draws
-window.addEventListener('click', (event) => {
+window.addEventListener('click', (event) =>
+{
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
@@ -893,36 +999,45 @@ window.addEventListener('click', (event) => {
     const currentPlayer = players[gameState.currentPlayerIndex];
 
     // handle card click
-    if (intersects.length > 0 && intersects[0].object.userData.cardView) {
+    if (intersects.length > 0 && intersects[0].object.userData.cardView)
+    {
         handleCardClick(intersects[0].object.userData.cardView);
         return;
     }
 
     // deck click
-    if (currentPlayer.isRealPlayer && gameState.isGameActive) {
-        if (gameState.isDrawTwoActive) {
+    if (currentPlayer.isRealPlayer && gameState.isGameActive)
+    {
+        if (gameState.isDrawTwoActive)
+        {
             // If player has a Two, must play it
             const twoCard = currentPlayer.cards.find(c => c.model.rank === Rank.Two);
-            if (twoCard) {
+            if (twoCard)
+            {
                 playCard(twoCard, currentPlayer);
-            } else {
+            } else
+            {
                 // draw stacked cards
                 gameState.resolveDrawTwo();
             }
-        } else {
+        } else
+        {
             // normal draw
             const hasPlayable = currentPlayer.cards.some(card => gameState.isCardPlayable(card));
-            if (!hasPlayable && deck.length > 0) {
+            if (!hasPlayable && deck.length > 0)
+            {
                 const drawnCard = deck.pop();
                 currentPlayer.addCard(drawnCard);
                 gameUI.showMessage('Card Drawn');
-                
+
                 // Check if drawn card can be played
-                if (gameState.isCardPlayable(drawnCard)) {
+                if (gameState.isCardPlayable(drawnCard))
+                {
                     gameUI.showMessage('You can play the drawn card!');
                     // Card is playable, but don't play it automatically
                     // Player needs to click on it to play it
-                } else {
+                } else
+                {
                     // Card is not playable, go to next turn
                     gameState.nextTurn();
                     handleAITurn();
