@@ -812,15 +812,23 @@ function handleAITurn()
                 {
                     const drawnCard = deck.pop();
                     currentPlayer.addCard(drawnCard);
+                    gameUI.showMessage(`Player ${gameState.currentPlayerIndex + 1} drew a card`);
 
                     // Check if drawn card can be played
                     if (gameState.isCardPlayable(drawnCard))
                     {
-                        setTimeout(() => playCard(drawnCard, currentPlayer), 500);
+                        // AI always plays the drawn card if it can
+                        setTimeout(() => {
+                            gameUI.showMessage(`Player ${gameState.currentPlayerIndex + 1} plays drawn card`);
+                            playCard(drawnCard, currentPlayer);
+                        }, 500);
                     } else
                     {
-                        gameState.nextTurn();
-                        handleAITurn();
+                        // Card is not playable, go to next turn
+                        setTimeout(() => {
+                            gameState.nextTurn();
+                            handleAITurn();
+                        }, 500);
                     }
                 }
             }
@@ -886,8 +894,17 @@ window.addEventListener('click', (event) => {
                 const drawnCard = deck.pop();
                 currentPlayer.addCard(drawnCard);
                 gameUI.showMessage('Card Drawn');
-                gameState.nextTurn();
-                handleAITurn();
+                
+                // Check if drawn card can be played
+                if (gameState.isCardPlayable(drawnCard)) {
+                    gameUI.showMessage('You can play the drawn card!');
+                    // Card is playable, but don't play it automatically
+                    // Player needs to click on it to play it
+                } else {
+                    // Card is not playable, go to next turn
+                    gameState.nextTurn();
+                    handleAITurn();
+                }
             }
         }
     }
