@@ -365,6 +365,24 @@ class Player
         this.cards = [];
     }
 
+    sortHand()
+    {
+        this.cards.sort((firstCard, secondCard) => {
+            // If one is an Eight and the other isn't, Eight goes to the end
+            if (firstCard.model.rank === Rank.Eight && secondCard.model.rank !== Rank.Eight)
+                return 1;
+            if (secondCard.model.rank === Rank.Eight && firstCard.model.rank !== Rank.Eight)
+                return -1;
+
+            // If suits are different, sort by suit
+            if (firstCard.model.suit !== secondCard.model.suit)
+                return firstCard.model.suit.localeCompare(secondCard.model.suit);
+
+            // If suits are same, sort by rank
+            return firstCard.model.rank - secondCard.model.rank;
+        });
+    }
+
     addCard(cardView)
     {
         // Store the original deck position for animation
@@ -372,6 +390,9 @@ class Player
 
         // Add card to player's hand
         this.cards.push(cardView);
+
+        // Sort the hand
+        this.sortHand();
 
         // Calculate the final position using arrangeCards
         this.arrangeCards();
@@ -452,15 +473,26 @@ function shuffleDeck(deck)
 // Kartları dağıt
 deck = shuffleDeck(deck);
 
-// Her oyuncuya 3 kart dağıt
-players.forEach(player =>
+// Her oyuncuya 3 kart dağıt ve pozisyonlarını düzenle
+players.forEach((player, playerIndex) =>
 {
     for (let i = 0; i < gameConfig.initialCardsPerPlayer; i++)
     {
         const card = deck.pop();
         if (card)
         {
-            player.addCard(card);
+            // Original deck position for each card
+            const startPosition = card.mesh.position.clone();
+
+            // Add card to player's hand without animation
+            player.cards.push(card);
+
+            // After all cards are added, sort and arrange them
+            if (i === gameConfig.initialCardsPerPlayer - 1)
+            {
+                player.sortHand();
+                player.arrangeCards();
+            }
         }
     }
 });
@@ -1045,24 +1077,9 @@ function animateInvalidMove(cardView)
     gameUI.showMessage("Invalid Move! Try another card.");
 }
 
-// Update click handler to use new game logic and handle deck draws
-window.addEventListener('click', (event) =>
+// Deck tıklama işleyicisi
+function handleDeckClick(currentPlayer)
 {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    const currentPlayer = players[gameState.currentPlayerIndex];
-
-    // handle card click
-    if (intersects.length > 0 && intersects[0].object.userData.cardView)
-    {
-        handleCardClick(intersects[0].object.userData.cardView);
-        return;
-    }
-
-    // deck click
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
         if (gameState.isDrawTwoActive)
@@ -1091,15 +1108,44 @@ window.addEventListener('click', (event) =>
                 if (gameState.isCardPlayable(drawnCard))
                 {
                     gameUI.showMessage('You can play the drawn card!');
-                    // Card is playable, but don't play it automatically
-                    // Player needs to click on it to play it
                 } else
                 {
-                    // Card is not playable, go to next turn
                     gameState.nextTurn();
                     handleAITurn();
                 }
             }
+        }
+    }
+}
+
+// Update click handler to use new game logic and handle deck draws
+window.addEventListener('click', (event) =>
+{
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(scene.children, true);
+    const currentPlayer = players[gameState.currentPlayerIndex];
+
+    if (intersects.length > 0 && intersects[0].object.userData.cardView)
+    {
+        const clickedCard = intersects[0].object.userData.cardView;
+        
+        // Tıklanan kartın deck'te olup olmadığını kontrol et
+        const isDeckCard = deck.includes(clickedCard) && 
+            Math.abs(clickedCard.mesh.position.x - gameConfig.deckPosition.x) < 0.1 &&
+            Math.abs(clickedCard.mesh.position.y - gameConfig.deckPosition.y) < 0.1;
+
+        if (isDeckCard)
+        {
+            // Deck'teki bir karta tıklandı
+            handleDeckClick(currentPlayer);
+        }
+        else
+        {
+            // Normal kart tıklama işlemi
+            handleCardClick(clickedCard);
         }
     }
 });
