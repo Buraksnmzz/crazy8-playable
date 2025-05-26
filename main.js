@@ -257,6 +257,34 @@ class CardViewJS
 
         animate();
     }
+
+    updateEightCardTexture(newSuit)
+    {
+        const realEightTexturePath = `assets/Real8/${newSuit}8Real.png`;
+        
+        // Yeni texture'ı yükle
+        textureLoader.load(realEightTexturePath,
+            (texture) =>
+            {
+                const maxAni = renderer.capabilities.getMaxAnisotropy();
+                texture.anisotropy = maxAni;
+                texture.encoding = THREE.sRGBEncoding;
+                texture.minFilter = THREE.LinearMipMapLinearFilter;
+                texture.magFilter = THREE.LinearFilter;
+                texture.generateMipmaps = true;
+                
+                this.frontMaterial.map = texture;
+                this.frontMaterial.needsUpdate = true;
+                
+                if (this.isFaceUp && this.mesh)
+                {
+                    this.mesh.material = this.frontMaterial;
+                }
+            },
+            undefined,
+            (error) => console.error(`Real8 texture yükleme hatası ${realEightTexturePath}:`, error)
+        );
+    }
 }
 
 // Deste Oluşturma
@@ -615,6 +643,11 @@ class GameState
                     }
 
                     cardView.model.changedSuit = maxSuit;
+                    // Eğer bir 8 kartı oynadıysa, texturesini güncelle
+                    if (cardView.model.rank === Rank.Eight)
+                    {
+                        cardView.updateEightCardTexture(maxSuit);
+                    }
                     gameUI.showMessage(`AI changed suit to ${maxSuit}!`);
                     // Handle turn change with delay for AI
                     setTimeout(() =>
@@ -782,6 +815,11 @@ class SuitSelectionUI
         if (gameState.pileTopCard)
         {
             gameState.pileTopCard.model.changedSuit = selectedSuit;
+            // Eğer pileTopCard bir 8 ise, texturesini güncelle
+            if (gameState.pileTopCard.model.rank === Rank.Eight)
+            {
+                gameState.pileTopCard.updateEightCardTexture(selectedSuit);
+            }
         }
 
         this.hide();
