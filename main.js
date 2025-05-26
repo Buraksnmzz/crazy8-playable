@@ -261,7 +261,7 @@ class CardViewJS
     updateEightCardTexture(newSuit)
     {
         const realEightTexturePath = `assets/Real8/${newSuit}8Real.png`;
-        
+
         // Yeni texture'ı yükle
         textureLoader.load(realEightTexturePath,
             (texture) =>
@@ -272,10 +272,10 @@ class CardViewJS
                 texture.minFilter = THREE.LinearMipMapLinearFilter;
                 texture.magFilter = THREE.LinearFilter;
                 texture.generateMipmaps = true;
-                
+
                 this.frontMaterial.map = texture;
                 this.frontMaterial.needsUpdate = true;
-                
+
                 if (this.isFaceUp && this.mesh)
                 {
                     this.mesh.material = this.frontMaterial;
@@ -340,6 +340,16 @@ const gameConfig = {
     }
 };
 
+// Hint sistemi değişkenleri
+let hintedCards = [];     // Hint olarak gösterilen kartlar (birden fazla olabilir)
+let hintTimeout = null;   // Hint gösterme için zamanlama referansı
+const hintDistance = 0.5;   // Kartın ne kadar yukarı çıkacağını belirler
+
+// Deck üzerindeki el imleci için değişkenler
+let deckHandSprite = null;
+let deckHandAnimation = null;
+let isDeckHintActive = false;
+
 // Oyuncu pozisyonlarını güncelle
 function updatePlayerPositions()
 {
@@ -367,7 +377,8 @@ class Player
 
     sortHand()
     {
-        this.cards.sort((firstCard, secondCard) => {
+        this.cards.sort((firstCard, secondCard) =>
+        {
             // If one is an Eight and the other isn't, Eight goes to the end
             if (firstCard.model.rank === Rank.Eight && secondCard.model.rank !== Rank.Eight)
                 return 1;
@@ -614,6 +625,9 @@ class GameState
 
     nextTurn()
     {
+        // Önceki hint'i temizle
+        resetHintedCard();
+
         if (this.isReversed)
         {
             this.currentPlayerIndex = (this.currentPlayerIndex - 1 + players.length) % players.length;
@@ -624,6 +638,9 @@ class GameState
 
         // Update UI for new turn
         gameUI.updateTurnIndicator(this.currentPlayerIndex);
+
+        // Yeni hint fonksiyonumuzu çağır
+        checkPlayerTurnAndHint();
     }
 
     applyCardEffect(cardView)
@@ -745,6 +762,9 @@ class GameState
 // Create game state instance
 const gameState = new GameState();
 gameState.pileTopCard = pileCard; // Set initial pile card
+
+// Oyun başlangıcında hint kontrolü yap
+checkPlayerTurnAndHint();
 
 // Game UI Components
 class SuitSelectionUI
@@ -1042,13 +1062,95 @@ function handleAITurn()
                         // Card is not playable, go to next turn
                         setTimeout(() =>
                         {
-                            gameState.nextTurn();
+                            gameState.nextTurn(); // This already calls checkPlayerTurnAndHint
                             handleAITurn();
                         }, 700); // Adjusted for new animation speed
                     }
                 }
             }
         }, 1500); // Increased delay for AI turn from 0.5 to 1.5 seconds
+    }
+}
+
+// Hint sistemi fonksiyonları
+function showHint()
+{
+    // Mevcut bir hint varsa temizle
+    resetHintedCard();
+
+    // Sadece gerçek oyuncunun sırası ve oyun aktifse hint göster
+    if (gameState.currentPlayerIndex === 0 && gameState.isGameActive)
+    {
+        const realPlayer = players[0];
+
+        // Oynanabilir kartları bul
+        const playableCards = realPlayer.cards.filter(card => gameState.isCardPlayable(card));
+
+        // Eğer oynanabilir kart varsa tüm oynanabilir kartları hint olarak göster
+        if (playableCards.length > 0)
+        {
+            // Tüm oynanabilir kartlar için
+            playableCards.forEach(card =>
+            {
+                // Kartın mevcut pozisyonunu ve ölçeğini kaydet
+                const currentPos = card.mesh.position.clone();
+
+                // Kartın orijinal ölçeğini kaydet (geri dönerken kullanmak için)
+                card.originalScale = card.mesh.scale.clone();
+
+                // Kartı yukarı çıkar ve hafifçe büyüt
+                card.moveTo(
+                    new THREE.Vector3(currentPos.x, currentPos.y + hintDistance, currentPos.z),
+                    0.3 // Daha hızlı animasyon
+                );
+
+
+                // Hint edilen kartlar listesine ekle
+                hintedCards.push(card);
+            });
+        }
+        // Oynanabilir kart yoksa ve deste boş değilse, kart çekmesi gerektiğini belirt
+        else if (deck.length > 0) 
+        {
+            // Deck üzerinde el işareti göster
+            createDeckHandHint();
+        }
+    }
+}
+
+function resetHintedCard()
+{
+    // Eğer önceden kartlar hint olarak gösterilmişse pozisyonlarını sıfırla
+    if (hintedCards.length > 0)
+    {
+
+        const player = players[0];
+        player.arrangeCards(); // Tüm kartları doğru pozisyona geri getir
+        hintedCards = []; // Hint edilen kartlar listesini temizle
+    }
+
+    // Deck üzerindeki el işaretini temizle
+    removeDeckHandHint();
+
+    // Eğer bekleyen bir timeout varsa temizle
+    if (hintTimeout)
+    {
+        clearTimeout(hintTimeout);
+        hintTimeout = null;
+    }
+}
+
+// Yeni fonksiyon: Oyuncunun sırasını kontrol et ve gerekirse hint göster
+function checkPlayerTurnAndHint()
+{
+    // Önceki hint'i temizle
+    resetHintedCard();
+
+    // Eğer şu anda gerçek oyuncunun sırası ise ve oyun aktif ise
+    if (gameState.currentPlayerIndex === 0 && gameState.isGameActive)
+    {
+        // 1 saniye sonra hint göster
+        hintTimeout = setTimeout(showHint, 1000);
     }
 }
 
@@ -1082,6 +1184,9 @@ function handleDeckClick(currentPlayer)
 {
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
+        // El işaretini kaldır
+        removeDeckHandHint();
+
         if (gameState.isDrawTwoActive)
         {
             // If player has a Two, must play it
@@ -1108,6 +1213,23 @@ function handleDeckClick(currentPlayer)
                 if (gameState.isCardPlayable(drawnCard))
                 {
                     gameUI.showMessage('You can play the drawn card!');
+
+                    // Newly drawn card hint effect
+                    setTimeout(() =>
+                    {
+                        // Store card's current position and original scale
+                        const currentPos = drawnCard.mesh.position.clone();
+                        drawnCard.originalScale = drawnCard.mesh.scale.clone();
+
+                        // Move the card up and scale it for hint effect
+                        drawnCard.moveTo(
+                            new THREE.Vector3(currentPos.x, currentPos.y + hintDistance, currentPos.z),
+                            0.3 // Quick animation
+                        );
+
+                        // Add to hinted cards so it can be reset properly later
+                        hintedCards.push(drawnCard);
+                    }, 600); // Small delay after the card is added to hand
                 } else
                 {
                     gameState.nextTurn();
@@ -1131,9 +1253,9 @@ window.addEventListener('click', (event) =>
     if (intersects.length > 0 && intersects[0].object.userData.cardView)
     {
         const clickedCard = intersects[0].object.userData.cardView;
-        
+
         // Tıklanan kartın deck'te olup olmadığını kontrol et
-        const isDeckCard = deck.includes(clickedCard) && 
+        const isDeckCard = deck.includes(clickedCard) &&
             Math.abs(clickedCard.mesh.position.x - gameConfig.deckPosition.x) < 0.1 &&
             Math.abs(clickedCard.mesh.position.y - gameConfig.deckPosition.y) < 0.1;
 
@@ -1149,3 +1271,79 @@ window.addEventListener('click', (event) =>
         }
     }
 });
+
+// El işaretini oluştur ve göster
+function createDeckHandHint()
+{
+    // Eğer zaten varsa önce temizle
+    removeDeckHandHint();
+
+    // El sprite'ı için materyal oluştur
+    const handTexture = new THREE.TextureLoader().load('assets/hand.png');
+    const handMaterial = new THREE.SpriteMaterial({
+        map: handTexture,
+        transparent: true,
+        opacity: 0.9
+    });
+
+    // El sprite'ını oluştur
+    deckHandSprite = new THREE.Sprite(handMaterial);
+
+    // Pozisyonu deck'in üstünde olacak şekilde ayarla
+    const deckPos = gameConfig.deckPosition.clone();
+    deckHandSprite.position.set(deckPos.x, deckPos.y + 0.5, deckPos.z + 0.5);
+
+    // Boyutu ayarla
+    deckHandSprite.scale.set(3, 3, 3);
+
+    // Scene'e ekle
+    scene.add(deckHandSprite);
+
+    // Animasyon değişkenlerini ayarla
+    const startX = deckPos.x - 0.2;
+    const endX = deckPos.x + 0.2;
+    let direction = 1; // 1: sağa, -1: sola
+    let currentX = startX;
+
+    // Animasyon fonksiyonu
+    function animateHand()
+    {
+        // El işaretini sağa-sola hareket ettir
+        currentX += 0.01 * direction;
+
+        // Yön değiştirme
+        if (currentX >= endX) direction = -1;
+        if (currentX <= startX) direction = 1;
+
+        // Pozisyonu güncelle
+        deckHandSprite.position.x = currentX;
+
+        // Animasyonu devam ettir
+        if (isDeckHintActive)
+        {
+            deckHandAnimation = requestAnimationFrame(animateHand);
+        }
+    }
+
+    // Animasyonu başlat
+    isDeckHintActive = true;
+    animateHand();
+}
+
+// El işaretini temizle
+function removeDeckHandHint()
+{
+    if (deckHandSprite)
+    {
+        scene.remove(deckHandSprite);
+        deckHandSprite = null;
+    }
+
+    if (deckHandAnimation)
+    {
+        cancelAnimationFrame(deckHandAnimation);
+        deckHandAnimation = null;
+    }
+
+    isDeckHintActive = false;
+}
