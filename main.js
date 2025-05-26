@@ -8,6 +8,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0); // Arka planı tamamen şeffaf yap
+renderer.sortObjects = false; // renderOrder değerlerinin tam olarak uygulanması için
 document.body.appendChild(renderer.domElement);
 
 // Kart Türleri (Suits) - Dosya adlarıyla eşleşecek şekilde (örn: Spade01.png)
@@ -181,6 +182,15 @@ class CardViewJS
         const startPosition = this.mesh.position.clone();
         const startTime = Date.now();
 
+        // Kartı sahne hiyerarşisinde en sona taşıyarak ön planda görünmesini sağla
+        scene.remove(this.mesh);
+        scene.add(this.mesh);
+
+        const originalRenderOrder = this.mesh.renderOrder;
+        const originalDepthTest = this.mesh.material.depthTest;
+        this.mesh.renderOrder = gameConfig.renderOrders.moving; // Hareket sırasında en üstte göster
+        this.mesh.material.depthTest = false; // Derinlik testi kapat
+
         const animate = () =>
         {
             const currentTime = Date.now();
@@ -195,12 +205,13 @@ class CardViewJS
                 const newZ = startPosition.z + (targetPosition.z - startPosition.z) * progress;
 
                 this.setPosition(newX, newY, newZ);
-
                 requestAnimationFrame(animate);
             } else
             {
                 // Ensure we end exactly at target position
                 this.setPosition(targetPosition.x, targetPosition.y, targetPosition.z);
+                this.mesh.renderOrder = originalRenderOrder; // Orijinal sıralamaya geri dön
+                this.mesh.material.depthTest = originalDepthTest; // Orijinal derinlik testi geri dön
             }
         };
 
@@ -292,7 +303,13 @@ const gameConfig = {
     pilePosition: new THREE.Vector3(3, 0, 0),      // Atılan kartların pozisyonu
     marginPercentage: 0.85,                        // Ekran kenarlarına olan mesafe (yüzde olarak)
     cardSpacing: 2,                                // Kartlar arası mesafe
-    initialCardsPerPlayer: 3                       // Her oyuncuya dağıtılacak kart sayısı
+    initialCardsPerPlayer: 3,                      // Her oyuncuya dağıtılacak kart sayısı
+    renderOrders: {
+        deck: 100,         // Destenin temel render sırası
+        pile: 200,         // Atılan kartların temel render sırası
+        moving: 1000,      // Hareket eden kartın render sırası
+        hand: 300          // Eldeki kartların temel render sırası
+    }
 };
 
 // Oyuncu pozisyonlarını güncelle
@@ -426,6 +443,7 @@ if (pileCard)
 {
     pileCard.setPosition(gameConfig.pilePosition.x, gameConfig.pilePosition.y, 0);
     pileCard.showFront();
+    pileCard.mesh.renderOrder = gameConfig.renderOrders.pile;
 }
 
 // Kalan kartları deck pozisyonuna yerleştir
@@ -436,6 +454,7 @@ deck.forEach((card, index) =>
         gameConfig.deckPosition.y,
         0.001 * index
     );
+    card.mesh.renderOrder = gameConfig.renderOrders.deck + index;
 });
 
 // Örnek: Destenin ilk kartının ön yüzünü 1 saniye sonra göster
