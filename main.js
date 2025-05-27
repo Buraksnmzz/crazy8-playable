@@ -559,28 +559,66 @@ function shuffleDeck(deck)
     return deck;
 }
 
-// Kartları dağıt
+// Desteden belirli bir kart değerinde kart bul ve çıkart
+function findAndRemoveCardWithRank(deck, rank)
+{
+    const index = deck.findIndex(card => card.model.rank === rank);
+    if (index !== -1)
+    {
+        return deck.splice(index, 1)[0];
+    }
+    return null;
+}
+
+// Desteden sıradan bir kart bul ve çıkart (A, 2, 8, Q olmayan)
+function findAndRemoveRegularCard(deck)
+{
+    const index = deck.findIndex(card =>
+        card.model.rank !== Rank.Ace &&
+        card.model.rank !== Rank.Two &&
+        card.model.rank !== Rank.Eight &&
+        card.model.rank !== Rank.Queen
+    );
+    if (index !== -1)
+    {
+        return deck.splice(index, 1)[0];
+    }
+    return null;
+}
+
+// Desteyi karıştır
 deck = shuffleDeck(deck);
 
-// Her oyuncuya 3 kart dağıt ve pozisyonlarını düzenle
+// Her oyuncuya kartları dağıt
 players.forEach((player, playerIndex) =>
 {
-    for (let i = 0; i < gameConfig.initialCardsPerPlayer; i++)
+    if (player.isRealPlayer)
     {
-        const card = deck.pop();
-        if (card)
+        // Gerçek oyuncuya özel kartları ver
+        const twoCard = findAndRemoveCardWithRank(deck, Rank.Two);
+        const eightCard = findAndRemoveCardWithRank(deck, Rank.Eight);
+        const regularCard = findAndRemoveRegularCard(deck);
+
+        if (twoCard && eightCard && regularCard)
         {
-            // Original deck position for each card
-            const startPosition = card.mesh.position.clone();
-
-            // Add card to player's hand without animation
-            player.cards.push(card);
-
-            // After all cards are added, sort and arrange them
-            if (i === gameConfig.initialCardsPerPlayer - 1)
+            player.cards.push(twoCard, eightCard, regularCard);
+            player.sortHand();
+            player.arrangeCards();
+        }
+    } else
+    {
+        // Bot oyunculara normal dağıtım
+        for (let i = 0; i < gameConfig.initialCardsPerPlayer; i++)
+        {
+            const card = deck.pop();
+            if (card)
             {
-                player.sortHand();
-                player.arrangeCards();
+                player.cards.push(card);
+                if (i === gameConfig.initialCardsPerPlayer - 1)
+                {
+                    player.sortHand();
+                    player.arrangeCards();
+                }
             }
         }
     }
