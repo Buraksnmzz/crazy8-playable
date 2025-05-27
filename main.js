@@ -451,12 +451,16 @@ class Player
         });
     }
 
-    addCard(cardView)
+    addCard(cardView, skipArrange = false)
     {
         const startPosition = cardView.mesh.position.clone();
         this.cards.push(cardView);
         this.sortHand();
-        this.arrangeCards();
+
+        if (!skipArrange)
+        {
+            this.arrangeCards();
+        }
         const targetPosition = cardView.mesh.position.clone();
         cardView.setPosition(startPosition.x, startPosition.y, startPosition.z);
 
@@ -786,22 +790,39 @@ class GameState
     }
 
     // Method to resolve Draw Two when drawing
-    resolveDrawTwo()
+    async resolveDrawTwo()
     {
         const player = players[this.currentPlayerIndex];
-        // draw cards
+
+        // Önce tüm kartları ekle ve animasyonları bekle
         for (let i = 0; i < this.drawTwoAmount; i++)
         {
             if (deck.length > 0)
             {
                 const card = deck.pop();
-                player.addCard(card);
+                // Her kartın animasyonunu tamamlanmasını bekle
+                await new Promise(resolve =>
+                {
+                    // Her kart için arrangeCards yapılacak
+                    player.addCard(card, false);
+                    // Her kart için animasyon süresini bekle
+                    setTimeout(resolve, 500);
+                });
             }
         }
+
+        // Tüm kartlar eklendikten sonra pozisyonları tekrar düzenle
+        player.arrangeCards();
+
         gameUI.showMessage(`Player ${this.currentPlayerIndex + 1} drew ${this.drawTwoAmount} cards`);
+
         // reset
         this.drawTwoAmount = 0;
         this.isDrawTwoActive = false;
+
+        // Bir süre bekleyip sırayı değiştir
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // advance turn
         this.nextTurn();
         handleAITurn();
@@ -1403,7 +1424,7 @@ function createDeckHandHint()
     const handMaterial = new THREE.SpriteMaterial({
         map: handTexture,
         transparent: true,
-        opacity: 0.9
+        opacity: 1
     });
 
     // El sprite'ını oluştur
@@ -1411,7 +1432,7 @@ function createDeckHandHint()
 
     // Pozisyonu deck'in üstünde olacak şekilde ayarla
     const deckPos = gameConfig.deckPosition.clone();
-    deckHandSprite.position.set(deckPos.x, deckPos.y + 0.5, deckPos.z + 0.5);
+    deckHandSprite.position.set(deckPos.x - 1, deckPos.y + 0.5, deckPos.z + 0.5);
 
     // Boyutu ayarla
     deckHandSprite.scale.set(3, 3, 3);
@@ -1420,8 +1441,8 @@ function createDeckHandHint()
     scene.add(deckHandSprite);
 
     // Animasyon değişkenlerini ayarla
-    const startX = deckPos.x - 0.2;
-    const endX = deckPos.x + 0.2;
+    const startX = deckPos.x - 2.7;
+    const endX = deckPos.x - 2;
     let direction = 1; // 1: sağa, -1: sola
     let currentX = startX;
 
@@ -1429,7 +1450,7 @@ function createDeckHandHint()
     function animateHand()
     {
         // El işaretini sağa-sola hareket ettir
-        currentX += 0.01 * direction;
+        currentX += 0.02 * direction;
 
         // Yön değiştirme
         if (currentX >= endX) direction = -1;
