@@ -196,54 +196,49 @@ class CardViewJS
         const startPosition = this.mesh.position.clone();
         const startTime = Date.now();
 
-        // Kartı sahne hiyerarşisinde en sona taşıyarak ön planda görünmesini sağla
-        scene.remove(this.mesh);
-        scene.add(this.mesh);
-
         const originalRenderOrder = this.mesh.renderOrder;
         const originalDepthTest = this.mesh.material.depthTest;
-        
-        // Set render order based on where the card is moving
-        if (isToPile) {
-            // Moving to pile gets highest priority to always appear on top
+
+        if (isToPile)
+        {
+            // Pile'a giderken kartı en üstte göster
+            scene.remove(this.mesh);
+            scene.add(this.mesh);
+            this.mesh.material.depthTest = false;
             this.mesh.renderOrder = gameConfig.renderOrders.moving;
-        } else if (customRenderOrder !== null) {
-            // Use custom render order for deck to player animations
+        } else if (customRenderOrder !== null)
+        {
+            // Player'a giderken derinlik testini aktif tut ve render order'ı ayarla
             this.mesh.renderOrder = customRenderOrder;
         }
-        
-        this.mesh.material.depthTest = false; // Derinlik testi kapat
 
         const animate = () =>
         {
             const currentTime = Date.now();
-            const elapsed = (currentTime - startTime) / 1000; // Convert to seconds
+            const elapsed = (currentTime - startTime) / 1000;
             const progress = Math.min(elapsed / duration, 1);
 
             if (progress < 1)
             {
-                // Using outQubic easing for smoother animation
                 const easedProgress = Easing.easeOutQubic(progress);
 
-                // Apply easing to position interpolation
                 const newX = startPosition.x + (targetPosition.x - startPosition.x) * easedProgress;
                 const newY = startPosition.y + (targetPosition.y - startPosition.y) * easedProgress;
                 const newZ = startPosition.z + (targetPosition.z - startPosition.z) * easedProgress;
 
                 this.setPosition(newX, newY, newZ);
                 requestAnimationFrame(animate);
-            } else
+            }
+            else
             {
-                // Ensure we end exactly at target position
                 this.setPosition(targetPosition.x, targetPosition.y, targetPosition.z);
-                
-                // Only restore original render order for pile movements
-                // For player hand movements, we want to keep the calculated order
-                if (isToPile) {
+
+                if (isToPile)
+                {
+                    // Pile'a giden kartın son durumu
                     this.mesh.renderOrder = originalRenderOrder;
+                    this.mesh.material.depthTest = originalDepthTest;
                 }
-                
-                this.mesh.material.depthTest = originalDepthTest; // Orijinal derinlik testi geri dön
             }
         };
 
@@ -458,47 +453,43 @@ class Player
 
     addCard(cardView)
     {
-        // Store the original deck position for animation
         const startPosition = cardView.mesh.position.clone();
-
-        // Add card to player's hand
         this.cards.push(cardView);
-
-        // Sort the hand
         this.sortHand();
-
-        // Calculate the final position using arrangeCards
         this.arrangeCards();
-
-        // Get the current position (updated by arrangeCards)
         const targetPosition = cardView.mesh.position.clone();
-
-        // Reset to deck position for animation
         cardView.setPosition(startPosition.x, startPosition.y, startPosition.z);
 
-        // Find the index of the card in the sorted hand
+        // Kartın eldeki pozisyonuna göre render order hesapla
         const cardIndex = this.cards.indexOf(cardView);
-        
-        // Calculate suitable render order for deck to player animation
-        // This ensures the card appears in the correct z-order during animation
-        let animationRenderOrder;
-        if (cardIndex > 0 && cardIndex < this.cards.length - 1) {
-            // If card is between two other cards, set render order to be between them
+        const baseOrder = gameConfig.renderOrders.hand;
+        let renderOrder;
+
+        if (cardIndex > 0 && cardIndex < this.cards.length - 1)
+        {
+            // Kartların mevcut render order'larını al
             const prevCard = this.cards[cardIndex - 1];
             const nextCard = this.cards[cardIndex + 1];
-            animationRenderOrder = Math.floor((prevCard.mesh.renderOrder + nextCard.mesh.renderOrder) / 2);
-        } else if (cardIndex === 0) {
-            // Card will be the first in hand
-            const nextCard = this.cards[1]; // There should be at least one more card
-            animationRenderOrder = nextCard ? nextCard.mesh.renderOrder - 10 : gameConfig.renderOrders.hand;
-        } else {
-            // Card will be the last in hand
+            const prevOrder = prevCard.mesh.renderOrder;
+            const nextOrder = nextCard.mesh.renderOrder;
+
+            // İki kartın arasında bir değer hesapla
+            renderOrder = Math.floor(prevOrder + (nextOrder - prevOrder) / 2);
+        } else if (cardIndex === 0)
+        {
+            // İlk kart için en düşük render order
+            const nextCard = this.cards[1];
+            renderOrder = nextCard ? nextCard.mesh.renderOrder - 10 : baseOrder;
+        } else
+        {
+            // Son kart için en yüksek render order
             const prevCard = this.cards[cardIndex - 1];
-            animationRenderOrder = prevCard ? prevCard.mesh.renderOrder + 10 : gameConfig.renderOrders.hand + this.cards.length * 10;
+            renderOrder = prevCard ? prevCard.mesh.renderOrder + 10 : baseOrder + this.cards.length * 10;
         }
 
-        // Animate the card from deck to hand with the calculated render order
-        cardView.moveTo(targetPosition, 0.5, false, animationRenderOrder);
+        // Kartı hareket ettir ve render order'ı ayarla
+        cardView.moveTo(targetPosition, 0.5, false, renderOrder);
+        cardView.mesh.renderOrder = renderOrder;
     }
 
     arrangeCards()
