@@ -1,6 +1,20 @@
 const canvas = document.getElementById("gameCanvas");
 const scene = new THREE.Scene();
 
+// Easing functions for animations
+const Easing = {
+    linear: t => t,
+    easeInQubic: t => t * t * t,
+    easeOutQubic: t => 1 - Math.pow(1 - t, 3),
+    easeInOutQubic: t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+    easeOutBack: t =>
+    {
+        const c1 = 1.70158;
+        const c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+    }
+};
+
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.position.z = 20; // Kamerayı daha da uzağa aldık
 
@@ -175,7 +189,7 @@ class CardViewJS
     }
 
     // Smooth animation for card movement
-    moveTo(targetPosition, duration = 0.5)
+    moveTo(targetPosition, duration = 0.5, isToPile = false, customRenderOrder = null)
     {
         if (!this.mesh) return;
 
@@ -188,7 +202,16 @@ class CardViewJS
 
         const originalRenderOrder = this.mesh.renderOrder;
         const originalDepthTest = this.mesh.material.depthTest;
-        this.mesh.renderOrder = gameConfig.renderOrders.moving; // Hareket sırasında en üstte göster
+        
+        // Set render order based on where the card is moving
+        if (isToPile) {
+            // Moving to pile gets highest priority to always appear on top
+            this.mesh.renderOrder = gameConfig.renderOrders.moving;
+        } else if (customRenderOrder !== null) {
+            // Use custom render order for deck to player animations
+            this.mesh.renderOrder = customRenderOrder;
+        }
+        
         this.mesh.material.depthTest = false; // Derinlik testi kapat
 
         const animate = () =>
@@ -199,10 +222,13 @@ class CardViewJS
 
             if (progress < 1)
             {
-                // Linear interpolation between start and target positions
-                const newX = startPosition.x + (targetPosition.x - startPosition.x) * progress;
-                const newY = startPosition.y + (targetPosition.y - startPosition.y) * progress;
-                const newZ = startPosition.z + (targetPosition.z - startPosition.z) * progress;
+                // Using outQubic easing for smoother animation
+                const easedProgress = Easing.easeOutQubic(progress);
+
+                // Apply easing to position interpolation
+                const newX = startPosition.x + (targetPosition.x - startPosition.x) * easedProgress;
+                const newY = startPosition.y + (targetPosition.y - startPosition.y) * easedProgress;
+                const newZ = startPosition.z + (targetPosition.z - startPosition.z) * easedProgress;
 
                 this.setPosition(newX, newY, newZ);
                 requestAnimationFrame(animate);
@@ -210,7 +236,13 @@ class CardViewJS
             {
                 // Ensure we end exactly at target position
                 this.setPosition(targetPosition.x, targetPosition.y, targetPosition.z);
-                this.mesh.renderOrder = originalRenderOrder; // Orijinal sıralamaya geri dön
+                
+                // Only restore original render order for pile movements
+                // For player hand movements, we want to keep the calculated order
+                if (isToPile) {
+                    this.mesh.renderOrder = originalRenderOrder;
+                }
+                
                 this.mesh.material.depthTest = originalDepthTest; // Orijinal derinlik testi geri dön
             }
         };
@@ -240,10 +272,13 @@ class CardViewJS
 
             if (progress < 1)
             {
-                // Linear interpolation between start and target rotation
-                const newX = startRotation.x + (targetRotation.x - startRotation.x) * progress;
-                const newY = startRotation.y + (targetRotation.y - startRotation.y) * progress;
-                const newZ = startRotation.z + (targetRotation.z - startRotation.z) * progress;
+                // Using outQubic easing for smoother rotation
+                const easedProgress = Easing.easeOutQubic(progress);
+
+                // Apply easing to rotation interpolation
+                const newX = startRotation.x + (targetRotation.x - startRotation.x) * easedProgress;
+                const newY = startRotation.y + (targetRotation.y - startRotation.y) * easedProgress;
+                const newZ = startRotation.z + (targetRotation.z - startRotation.z) * easedProgress;
 
                 this.setRotation(newX, newY, newZ);
 
@@ -284,6 +319,32 @@ class CardViewJS
             undefined,
             (error) => console.error(`Real8 texture yükleme hatası ${realEightTexturePath}:`, error)
         );
+    }
+
+    // Kartı gri yapmak için yeni metod
+    grayOut()
+    {
+        if (!this.mesh || !this.mesh.material) return;
+
+        // Orijinal materyali sakla
+        this.originalMaterial = this.mesh.material;
+
+        // Gri materyal oluştur
+        const grayMaterial = this.mesh.material.clone();
+        grayMaterial.color = new THREE.Color(0.45, 0.45, 0.45); // Gri renk
+        grayMaterial.opacity = 1; // Yarı şeffaf
+
+        // Gri materyali uygula
+        this.mesh.material = grayMaterial;
+    }
+
+    // Kartın orijinal görünümünü geri yükle
+    restoreColor()
+    {
+        if (!this.mesh || !this.originalMaterial) return;
+
+        this.mesh.material = this.originalMaterial;
+        this.originalMaterial = null;
     }
 }
 
@@ -342,6 +403,7 @@ const gameConfig = {
 
 // Hint sistemi değişkenleri
 let hintedCards = [];     // Hint olarak gösterilen kartlar (birden fazla olabilir)
+let grayedCards = [];     // Hint sırasında grileştirilen kartlar
 let hintTimeout = null;   // Hint gösterme için zamanlama referansı
 const hintDistance = 0.5;   // Kartın ne kadar yukarı çıkacağını belirler
 
@@ -414,8 +476,29 @@ class Player
         // Reset to deck position for animation
         cardView.setPosition(startPosition.x, startPosition.y, startPosition.z);
 
-        // Animate the card from deck to hand
-        cardView.moveTo(targetPosition, 0.5);
+        // Find the index of the card in the sorted hand
+        const cardIndex = this.cards.indexOf(cardView);
+        
+        // Calculate suitable render order for deck to player animation
+        // This ensures the card appears in the correct z-order during animation
+        let animationRenderOrder;
+        if (cardIndex > 0 && cardIndex < this.cards.length - 1) {
+            // If card is between two other cards, set render order to be between them
+            const prevCard = this.cards[cardIndex - 1];
+            const nextCard = this.cards[cardIndex + 1];
+            animationRenderOrder = Math.floor((prevCard.mesh.renderOrder + nextCard.mesh.renderOrder) / 2);
+        } else if (cardIndex === 0) {
+            // Card will be the first in hand
+            const nextCard = this.cards[1]; // There should be at least one more card
+            animationRenderOrder = nextCard ? nextCard.mesh.renderOrder - 10 : gameConfig.renderOrders.hand;
+        } else {
+            // Card will be the last in hand
+            const prevCard = this.cards[cardIndex - 1];
+            animationRenderOrder = prevCard ? prevCard.mesh.renderOrder + 10 : gameConfig.renderOrders.hand + this.cards.length * 10;
+        }
+
+        // Animate the card from deck to hand with the calculated render order
+        cardView.moveTo(targetPosition, 0.5, false, animationRenderOrder);
     }
 
     arrangeCards()
@@ -951,7 +1034,8 @@ function playCard(cardView, player)
     );
 
     // Animate card movement to the pile (0.5 seconds duration)
-    cardView.moveTo(targetPosition, 0.5);
+    // Specify isToPile=true to ensure highest render order
+    cardView.moveTo(targetPosition, 0.5, true);
 
     // Animate card rotation (with the random angle)
     cardView.rotateTo(0, 0, randomRotation * (Math.PI / 180), 0.5);
@@ -1086,6 +1170,9 @@ function showHint()
         // Oynanabilir kartları bul
         const playableCards = realPlayer.cards.filter(card => gameState.isCardPlayable(card));
 
+        // Oynanamayan kartları bul
+        const unplayableCards = realPlayer.cards.filter(card => !gameState.isCardPlayable(card));
+
         // Eğer oynanabilir kart varsa tüm oynanabilir kartları hint olarak göster
         if (playableCards.length > 0)
         {
@@ -1098,15 +1185,24 @@ function showHint()
                 // Kartın orijinal ölçeğini kaydet (geri dönerken kullanmak için)
                 card.originalScale = card.mesh.scale.clone();
 
-                // Kartı yukarı çıkar ve hafifçe büyüt
+                // Kartı yukarı çıkar - isToPile=false çünkü bu hala oyuncunun elinde
+                // customRenderOrder=null kullanırız çünkü render sırasını değiştirmek istemiyoruz
                 card.moveTo(
                     new THREE.Vector3(currentPos.x, currentPos.y + hintDistance, currentPos.z),
-                    0.3 // Daha hızlı animasyon
+                    0.3, // Daha hızlı animasyon
+                    false, // Pile'a hareket etmiyor, sadece yukarı kalkıyor
+                    null // customRenderOrder değerini değiştirmek istemiyoruz
                 );
-
 
                 // Hint edilen kartlar listesine ekle
                 hintedCards.push(card);
+            });
+
+            // Oynanamayan kartları grileştir
+            unplayableCards.forEach(card =>
+            {
+                card.grayOut();
+                grayedCards.push(card);
             });
         }
         // Oynanabilir kart yoksa ve deste boş değilse, kart çekmesi gerektiğini belirt
@@ -1114,6 +1210,13 @@ function showHint()
         {
             // Deck üzerinde el işareti göster
             createDeckHandHint();
+
+            // Tüm kartları grileştir çünkü hiçbiri oynanamaz
+            realPlayer.cards.forEach(card =>
+            {
+                card.grayOut();
+                grayedCards.push(card);
+            });
         }
     }
 }
@@ -1123,10 +1226,19 @@ function resetHintedCard()
     // Eğer önceden kartlar hint olarak gösterilmişse pozisyonlarını sıfırla
     if (hintedCards.length > 0)
     {
-
         const player = players[0];
         player.arrangeCards(); // Tüm kartları doğru pozisyona geri getir
         hintedCards = []; // Hint edilen kartlar listesini temizle
+    }
+
+    // Grileştirilmiş kartların renklerini geri getir
+    if (grayedCards.length > 0)
+    {
+        grayedCards.forEach(card =>
+        {
+            card.restoreColor();
+        });
+        grayedCards = []; // Grileştirilmiş kartlar listesini temizle
     }
 
     // Deck üzerindeki el işaretini temizle
@@ -1217,18 +1329,35 @@ function handleDeckClick(currentPlayer)
                     // Newly drawn card hint effect
                     setTimeout(() =>
                     {
+                        // Önce mevcut hint'leri temizle
+                        resetHintedCard();
+
                         // Store card's current position and original scale
                         const currentPos = drawnCard.mesh.position.clone();
                         drawnCard.originalScale = drawnCard.mesh.scale.clone();
 
                         // Move the card up and scale it for hint effect
+                        // Use the updated moveTo parameters
                         drawnCard.moveTo(
                             new THREE.Vector3(currentPos.x, currentPos.y + hintDistance, currentPos.z),
-                            0.3 // Quick animation
+                            0.3, // Quick animation
+                            false, // Not moving to pile
+                            null // No custom render order needed
                         );
 
                         // Add to hinted cards so it can be reset properly later
                         hintedCards.push(drawnCard);
+
+                        // Oynanamayan diğer kartları grileştir
+                        const realPlayer = players[0];
+                        realPlayer.cards.forEach(card =>
+                        {
+                            if (card !== drawnCard)
+                            {
+                                card.grayOut();
+                                grayedCards.push(card);
+                            }
+                        });
                     }, 600); // Small delay after the card is added to hand
                 } else
                 {
