@@ -37,10 +37,11 @@ cardMoveAudio.preload = 'auto';
 cardMoveAudio.load();
 
 let audioUnlocked = false;
-function unlockAudio() {
+function unlockAudio()
+{
     if (audioUnlocked) return;
-    interactionAudio.play().catch(() => {});
-    cardMoveAudio.play().catch(() => {});
+    interactionAudio.play().catch(() => { });
+    cardMoveAudio.play().catch(() => { });
     document.body.removeEventListener('touchstart', unlockAudio);
     audioUnlocked = true;
 }
@@ -1915,6 +1916,12 @@ function showEndScreen()
         }
     });
 }
+
+// Preload end-screen images to avoid late loading on phones
+const endCardPreloadImg = new Image();
+endCardPreloadImg.src = 'assets/EndCard.png';
+const playButtonPreloadImg = new Image();
+playButtonPreloadImg.src = 'assets/PlayButton.png';
 
 // Function to update card scaling and spacing
 function updateCardScalingAndSpacing()
