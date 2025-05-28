@@ -1770,6 +1770,10 @@ function removeCardHandHint()
 // Create end game screen with EndCard and PlayButton
 function showEndScreen()
 {
+    // Play end card sound
+    const endCardAudio = new Audio('assets/endcardsound.mp3');
+    endCardAudio.play().catch(() => { });
+
     // Create EndCard
     const endCardTexture = textureLoader.load(
         'assets/EndCard.png',
