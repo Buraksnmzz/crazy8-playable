@@ -1569,9 +1569,11 @@ function showEndScreen()
     const playButtonGeometry = new THREE.PlaneGeometry(5, 2.5); // Adjust size as needed
     const playButton = new THREE.Mesh(playButtonGeometry, playButtonMaterial);
 
-    // Position PlayButton at bottom 20% of EndCard
-    playButton.position.set(0, -5, 11); // Slightly in front of EndCard
-    scene.add(playButton);
+    // Position PlayButton inside EndCard near its bottom
+    // Calculate local Y offset based on EndCard height
+    const buttonY = -targetHeight / 2 + (2.5 / 2) + 0.2; // half of button height + small margin
+    playButton.position.set(0, buttonY, 0.1); // slight Z offset to be on top of EndCard
+    endCard.add(playButton);
 
     // Animate PlayButton
     let scaleUp = true;
