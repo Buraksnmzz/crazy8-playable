@@ -739,6 +739,16 @@ window.addEventListener('resize', () =>
 
     // re-calc player positions after margin change
     const positions = updatePlayerPositions();
+
+    // Portrait mode: move bottom and top players closer to center
+    if (isPortrait)
+    {
+        const yOffset = viewport.height * 0.15; // adjust this fraction as needed
+        // Bottom player up
+        positions[0].y += yOffset;
+        // Top player down
+        positions[2].y -= yOffset;
+    }
     players.forEach((player, index) =>
     {
         player.position = positions[index];
