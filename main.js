@@ -1576,6 +1576,7 @@ function showEndScreen()
     scene.add(endCard);
 
     // Create PlayButton
+    let playButton; // declare PlayButton mesh for animation
     const playButtonTexture = textureLoader.load(
         'assets/PlayButton.png',
         (texture) =>
@@ -1586,30 +1587,36 @@ function showEndScreen()
             texture.minFilter = THREE.LinearMipMapLinearFilter;
             texture.magFilter = THREE.LinearFilter;
             texture.generateMipmaps = true;
+            // Compute aspect-ratio based button size
+            const img = texture.image;
+            const aspect = img.height / img.width;
+            const buttonWidth = targetWidth * 0.5; // half of EndCard width
+            const buttonHeight = buttonWidth * aspect;
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                side: THREE.DoubleSide,
+                transparent: true,
+                alphaTest: 0.5
+            });
+            const geometry = new THREE.PlaneGeometry(buttonWidth, buttonHeight);
+            playButton = new THREE.Mesh(geometry, material);
+            // Position PlayButton inside EndCard near its bottom
+            const buttonY = -targetHeight / 2 + (buttonHeight / 2) + 0.2;
+            playButton.position.set(0, buttonY, 0.1);
+            endCard.add(playButton);
+            // Restart PlayButton animation
+            animatePlayButton();
+            // Click handler already in place on window listener
         },
         undefined,
         (error) => console.error('PlayButton texture load error:', error)
     );
-    const playButtonMaterial = new THREE.MeshBasicMaterial({
-        map: playButtonTexture,
-        side: THREE.DoubleSide,
-        transparent: true,
-        alphaTest: 0.5
-    });
-    const playButtonGeometry = new THREE.PlaneGeometry(5, 2.5); // Adjust size as needed
-    const playButton = new THREE.Mesh(playButtonGeometry, playButtonMaterial);
-
-    // Position PlayButton inside EndCard near its bottom
-    // Calculate local Y offset based on EndCard height
-    const buttonY = -targetHeight / 2 + (2.5 / 2) + 0.2; // half of button height + small margin
-    playButton.position.set(0, buttonY, 0.1); // slight Z offset to be on top of EndCard
-    endCard.add(playButton);
 
     // Animate PlayButton
     let scaleUp = true;
     const minScale = 0.95;
     const maxScale = 1.05;
-    const scaleSpeed = 0.002;
+    const scaleSpeed = 0.0008;
 
     function animatePlayButton()
     {
