@@ -30,6 +30,22 @@ interactionAudio.loop = true;
 // initialize card move sound effect
 const cardMoveAudio = new Audio('assets/CardMove.mp3');
 
+// Preload audio and unlock on first user interaction to enable mobile playback
+interactionAudio.preload = 'auto';
+interactionAudio.load();
+cardMoveAudio.preload = 'auto';
+cardMoveAudio.load();
+
+let audioUnlocked = false;
+function unlockAudio() {
+    if (audioUnlocked) return;
+    interactionAudio.play().catch(() => {});
+    cardMoveAudio.play().catch(() => {});
+    document.body.removeEventListener('touchstart', unlockAudio);
+    audioUnlocked = true;
+}
+document.body.addEventListener('touchstart', unlockAudio, { once: true });
+
 // Kart Türleri (Suits) - Dosya adlarıyla eşleşecek şekilde (örn: Spade01.png)
 const Suit = {
     Clubs: 'Club',
