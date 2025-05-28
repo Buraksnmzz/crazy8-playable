@@ -1063,10 +1063,10 @@ class SuitSelectionUI
 
         // Create buttons for each suit
         const suits = [
-            { name: 'Hearts', color: '#ff0000' },
-            { name: 'Diamonds', color: '#ff0000' },
-            { name: 'Clubs', color: '#000000' },
-            { name: 'Spades', color: '#000000' }
+            { name: 'Hearts', color: '#ff0000' },  // red
+            { name: 'Diamonds', color: '#0000ff' }, // blue
+            { name: 'Clubs', color: '#800080' },   // purple
+            { name: 'Spades', color: '#008000' }   // green
         ];
 
         suits.forEach(suit =>
@@ -1186,6 +1186,8 @@ function handleCardClick(cardView)
 // Function to play a card
 function playCard(cardView, player)
 {
+    // Remove the playable card hand hint as soon as the card is played
+    removeCardHandHint();
     // play card movement sound
     cardMoveAudio.currentTime = 0;
     cardMoveAudio.play().catch(() => { });
