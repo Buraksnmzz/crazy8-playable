@@ -27,6 +27,8 @@ document.body.appendChild(renderer.domElement);
 // initialize interaction audio
 const interactionAudio = new Audio('assets/backmusic.mp3');
 interactionAudio.loop = true;
+// initialize card move sound effect
+const cardMoveAudio = new Audio('assets/CardMove.mp3');
 
 // Kart Türleri (Suits) - Dosya adlarıyla eşleşecek şekilde (örn: Spade01.png)
 const Suit = {
@@ -1072,6 +1074,9 @@ function handleCardClick(cardView)
 // Function to play a card
 function playCard(cardView, player)
 {
+    // play card movement sound
+    cardMoveAudio.currentTime = 0;
+    cardMoveAudio.play().catch(() => { });
     // Remove card from player's hand
     const cardIndex = player.cards.indexOf(cardView);
     if (cardIndex > -1)
@@ -1197,6 +1202,9 @@ function handleAITurn()
                 if (deck.length > 0)
                 {
                     const drawnCard = deck.pop();
+                    // play draw card sound for AI
+                    cardMoveAudio.currentTime = 0;
+                    cardMoveAudio.play().catch(() => { });
                     currentPlayer.addCard(drawnCard);
                     gameUI.showMessage(`Player ${gameState.currentPlayerIndex + 1} drew a card`);
 
@@ -1362,10 +1370,11 @@ function animateInvalidMove(cardView)
 // Deck tıklama işleyicisi
 function handleDeckClick(currentPlayer)
 {
+    // play draw card sound
+    cardMoveAudio.currentTime = 0;
+    cardMoveAudio.play().catch(() => { });
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
-        // play interaction sound
-        interactionAudio.play().catch(() => { });
         // El işaretini kaldır
         removeDeckHandHint();
 
