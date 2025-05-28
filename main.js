@@ -647,7 +647,14 @@ players.forEach((player, playerIndex) =>
 });
 
 // Pile'a bir kart aç
-const pileCard = deck.pop();
+let pileCard = deck.pop();
+// Ensure the first pile card is not an Eight
+while (pileCard && pileCard.model.rank === Rank.Eight)
+{
+    // Put the Eight back into the deck bottom and draw again
+    deck.unshift(pileCard);
+    pileCard = deck.pop();
+}
 if (pileCard)
 {
     pileCard.setPosition(gameConfig.pilePosition.x, gameConfig.pilePosition.y, 0);
