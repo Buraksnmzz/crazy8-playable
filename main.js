@@ -24,6 +24,9 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0); // Arka planı tamamen şeffaf yap
 renderer.sortObjects = false; // renderOrder değerlerinin tam olarak uygulanması için
 document.body.appendChild(renderer.domElement);
+// initialize interaction audio
+const interactionAudio = new Audio('assets/backmusic.mp3');
+interactionAudio.loop = true;
 
 // Kart Türleri (Suits) - Dosya adlarıyla eşleşecek şekilde (örn: Spade01.png)
 const Suit = {
@@ -1037,6 +1040,9 @@ const suitSelectionUI = new SuitSelectionUI();
 // Event handler for card selection
 function handleCardClick(cardView)
 {
+    // play interaction sound
+    interactionAudio.play().catch(() => { });
+
     const currentPlayer = players[gameState.currentPlayerIndex];
 
     // Only allow interaction during player's turn and if they're the real player
@@ -1358,6 +1364,8 @@ function handleDeckClick(currentPlayer)
 {
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
+        // play interaction sound
+        interactionAudio.play().catch(() => { });
         // El işaretini kaldır
         removeDeckHandHint();
 
