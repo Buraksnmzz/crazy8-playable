@@ -743,7 +743,7 @@ window.addEventListener('resize', () =>
     // Portrait mode: move bottom and top players closer to center
     if (isPortrait)
     {
-        const yOffset = viewport.height * 0.15; // adjust this fraction as needed
+        const yOffset = viewport.height * 0.2; // adjust this fraction as needed
         // Bottom player up
         positions[0].y += yOffset;
         // Top player down
