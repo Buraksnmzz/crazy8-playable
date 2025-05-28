@@ -399,7 +399,7 @@ const gameConfig = {
     marginVertPercent: 0.8,                        // Vertical margin percent
     cardSpacing: 2,                                // Kartlar arası mesafe (will be updated dynamically)
     initialCardsPerPlayer: 3,                      // Her oyuncuya dağıtılacak kart sayısı
-    maxTotalTurns: 2,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
+    maxTotalTurns: 8,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
     // Card scaling targets
     cardWidthPercent: 0.2,                         // Kart genişliği: viewport genişliğinin yüzdesi
     cardHeightPercent: 0.35,                       // Kart yüksekliği: viewport yüksekliğinin yüzdesi
@@ -1373,15 +1373,6 @@ function showHint()
                 // Kartın orijinal ölçeğini kaydet (geri dönerken kullanmak için)
                 card.originalScale = card.mesh.scale.clone();
 
-                // Kartı yukarı çıkar - isToPile=false çünkü bu hala oyuncunun elinde
-                // customRenderOrder=null kullanırız çünkü render sırasını değiştirmek istemiyoruz
-                card.moveTo(
-                    new THREE.Vector3(currentPos.x, currentPos.y + hintDistance, currentPos.z),
-                    0.3, // Daha hızlı animasyon
-                    false, // Pile'a hareket etmiyor, sadece yukarı kalkıyor
-                    null // customRenderOrder değerini değiştirmek istemiyoruz
-                );
-
                 // Hint edilen kartlar listesine ekle
                 hintedCards.push(card);
             });
@@ -1456,7 +1447,7 @@ function checkPlayerTurnAndHint()
     if (gameState.currentPlayerIndex === 0 && gameState.isGameActive)
     {
         // 1 saniye sonra hint göster
-        hintTimeout = setTimeout(showHint, 1000);
+        hintTimeout = setTimeout(showHint, 300);
     }
 }
 
