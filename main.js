@@ -1063,6 +1063,22 @@ class SuitSelectionUI
 {
     constructor()
     {
+        this.isVisible = false; // Add visibility flag
+
+        // Create overlay to block interactions behind popup
+        this.overlay = document.createElement('div');
+        this.overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0);
+            display: none;
+            z-index: 999;
+        `;
+        document.body.appendChild(this.overlay);
+
         this.container = document.createElement('div');
         this.container.style.cssText = `
             position: fixed;
@@ -1073,7 +1089,7 @@ class SuitSelectionUI
             padding: 20px;
             border-radius: 10px;
             display: none;
-            z-index: 1000;
+            z-index: 1001;
         `;
 
         this.title = document.createElement('div');
@@ -1125,7 +1141,12 @@ class SuitSelectionUI
                 button.style.color = suit.color;
             });
 
-            button.addEventListener('click', () => this.handleSuitSelection(suit.name));
+            button.addEventListener('click', (event) =>
+            {
+                event.stopPropagation();
+                event.preventDefault();
+                this.handleSuitSelection(suit.name);
+            });
 
             this.buttonsContainer.appendChild(button);
         });
@@ -1137,11 +1158,15 @@ class SuitSelectionUI
 
     show()
     {
+        this.isVisible = true;
+        this.overlay.style.display = 'block';
         this.container.style.display = 'block';
     }
 
     hide()
     {
+        this.isVisible = false;
+        this.overlay.style.display = 'none';
         this.container.style.display = 'none';
     }
 
@@ -1169,12 +1194,16 @@ class SuitSelectionUI
         this.hide();
         gameUI.showMessage(`Suit changed to ${suitName}!`);
 
-        // Delay turn change after suit selection
+        // Add small delay before allowing interactions again
         setTimeout(() =>
         {
-            gameState.nextTurn();
-            handleAITurn();
-        }, 700); // Adjusted for new animation speed
+            // Delay turn change after suit selection
+            setTimeout(() =>
+            {
+                gameState.nextTurn();
+                handleAITurn();
+            }, 700); // Adjusted for new animation speed
+        }, 100); // Small delay to prevent event conflicts
     }
 }
 
@@ -1593,6 +1622,13 @@ function handleDeckClick(currentPlayer)
 // Update click handler to use new game logic and handle deck draws
 window.addEventListener('click', (event) =>
 {
+    // Block interactions when suit selection popup is visible
+    if (suitSelectionUI.isVisible)
+    {
+        console.log('Blocked interaction - popup is visible');
+        return;
+    }
+
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
