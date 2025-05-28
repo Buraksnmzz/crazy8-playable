@@ -388,6 +388,7 @@ const gameConfig = {
     marginPercentage: 0.85,                        // Ekran kenarlarına olan mesafe (yüzde olarak)
     cardSpacing: 2,                                // Kartlar arası mesafe
     initialCardsPerPlayer: 3,                      // Her oyuncuya dağıtılacak kart sayısı
+    maxTotalTurns: 2,                            // Toplam tur sayısı (8 tur × 4 oyuncu)
     renderOrders: {
         deck: 100,         // Destenin temel render sırası
         pile: 200,         // Atılan kartların temel render sırası
@@ -732,8 +733,9 @@ class GameState
         this.isReversed = false;
         this.pileTopCard = null;
         this.drawTwoAmount = 0;
-        this.isDrawTwoActive = false;  // Flag to track active Draw Two effect
+        this.isDrawTwoActive = false;
         this.isGameActive = true;
+        this.tourCount = 0; // Add tourCount variable
 
         // Update UI for initial state
         gameUI.updateTurnIndicator(this.currentPlayerIndex);
@@ -750,6 +752,16 @@ class GameState
         } else
         {
             this.currentPlayerIndex = (this.currentPlayerIndex + 1) % players.length;
+        }
+
+        // Her oyuncu değişiminde tourCount'u artır
+        this.tourCount++;
+        // maxTotalTurns'e ulaştığında oyunu bitir
+        if (this.tourCount === gameConfig.maxTotalTurns)
+        {
+            this.isGameActive = false;
+            showEndScreen();
+            return;
         }
 
         // Update UI for new turn
@@ -838,7 +850,7 @@ class GameState
             if (deck.length > 0)
             {
                 const card = deck.pop();
-                // Her kartın animasyonunu tamamlanmasını bekle
+                // Her kartın animasyonını tamamlanmasını bekle
                 await new Promise(resolve =>
                 {
                     // Her kart için arrangeCards yapılacak
@@ -1525,4 +1537,84 @@ function removeDeckHandHint()
     }
 
     isDeckHintActive = false;
+}
+
+// Create end game screen with EndCard and PlayButton
+function showEndScreen()
+{
+    // Create EndCard
+    const endCardTexture = textureLoader.load('assets/EndCard.png');
+    const endCardMaterial = new THREE.MeshBasicMaterial({
+        map: endCardTexture,
+        transparent: true
+    });
+
+    // Calculate EndCard size based on viewport
+    const viewport = calculateViewportDimensions(camera);
+    const targetHeight = viewport.height * 0.4; // reduced from 0.5 to 0.3 for smaller display
+    const aspectRatio = 1.5; // EndCard aspect ratio (height/width)
+    const targetWidth = targetHeight / aspectRatio;
+
+    const endCardGeometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
+    const endCard = new THREE.Mesh(endCardGeometry, endCardMaterial);
+    endCard.position.set(0, 0, 10);  // Center end card on screen
+    scene.add(endCard);
+
+    // Create PlayButton
+    const playButtonTexture = textureLoader.load('assets/PlayButton.png');
+    const playButtonMaterial = new THREE.MeshBasicMaterial({
+        map: playButtonTexture,
+        transparent: true
+    });
+    const playButtonGeometry = new THREE.PlaneGeometry(5, 2.5); // Adjust size as needed
+    const playButton = new THREE.Mesh(playButtonGeometry, playButtonMaterial);
+
+    // Position PlayButton at bottom 20% of EndCard
+    playButton.position.set(0, -5, 11); // Slightly in front of EndCard
+    scene.add(playButton);
+
+    // Animate PlayButton
+    let scaleUp = true;
+    const minScale = 0.95;
+    const maxScale = 1.05;
+    const scaleSpeed = 0.002;
+
+    function animatePlayButton()
+    {
+        if (!gameState.isGameActive)
+        {
+            requestAnimationFrame(animatePlayButton);
+
+            if (scaleUp)
+            {
+                playButton.scale.x += scaleSpeed;
+                playButton.scale.y += scaleSpeed;
+                if (playButton.scale.x >= maxScale) scaleUp = false;
+            } else
+            {
+                playButton.scale.x -= scaleSpeed;
+                playButton.scale.y -= scaleSpeed;
+                if (playButton.scale.x <= minScale) scaleUp = true;
+            }
+        }
+    }
+
+    animatePlayButton();
+
+    // Add click handler for PlayButton
+    window.addEventListener('click', (event) =>
+    {
+        if (!gameState.isGameActive)
+        {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObject(playButton);
+
+            if (intersects.length > 0)
+            {
+                location.reload(); // Restart game
+            }
+        }
+    });
 }
