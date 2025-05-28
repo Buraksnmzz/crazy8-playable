@@ -388,12 +388,21 @@ function calculateViewportDimensions(camera)
 
 // Oyun Yapılandırması
 const gameConfig = {
-    deckPosition: new THREE.Vector3(-3, 0, 0),     // Deste pozisyonu
-    pilePosition: new THREE.Vector3(3, 0, 0),      // Atılan kartların pozisyonu
-    marginPercentage: 0.85,                        // Ekran kenarlarına olan mesafe (yüzde olarak)
-    cardSpacing: 2,                                // Kartlar arası mesafe
+    // Current positions for deck and pile
+    deckPosition: new THREE.Vector3(),  // will be updated on resize
+    pilePosition: new THREE.Vector3(),
+    // Offsets as percentage of viewport
+    deckOffsetPercent: 0.1,                        // Deck distance from center
+    pileOffsetPercent: 0.1,                        // Pile distance from center
+    // Margins for player positioning
+    marginHorizPercent: 0.9,                       // Horizontal margin percent
+    marginVertPercent: 0.8,                        // Vertical margin percent
+    cardSpacing: 2,                                // Kartlar arası mesafe (will be updated dynamically)
     initialCardsPerPlayer: 3,                      // Her oyuncuya dağıtılacak kart sayısı
-    maxTotalTurns: 2,                            // Toplam tur sayısı (8 tur × 4 oyuncu)
+    maxTotalTurns: 2,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
+    // Card scaling targets
+    cardWidthPercent: 0.2,                         // Kart genişliği: viewport genişliğinin yüzdesi
+    cardHeightPercent: 0.35,                       // Kart yüksekliği: viewport yüksekliğinin yüzdesi
     renderOrders: {
         deck: 100,         // Destenin temel render sırası
         pile: 200,         // Atılan kartların temel render sırası
@@ -417,13 +426,15 @@ let isDeckHintActive = false;
 function updatePlayerPositions()
 {
     const viewport = calculateViewportDimensions(camera);
-    const margin = viewport.width * (1 - gameConfig.marginPercentage) / 2;
+    // Compute separate margins
+    const marginX = viewport.width * (1 - gameConfig.marginHorizPercent) / 2;
+    const marginY = viewport.height * (1 - gameConfig.marginVertPercent) / 2;
 
     return [
-        new THREE.Vector3(0, -viewport.height / 2 + margin, 0),             // Alt
-        new THREE.Vector3(-viewport.width / 2 + margin, 0, 0),             // Sol
-        new THREE.Vector3(0, viewport.height / 2 - margin, 0),             // Üst
-        new THREE.Vector3(viewport.width / 2 - margin, 0, 0)              // Sağ
+        new THREE.Vector3(0, -viewport.height / 2 + marginY, 0),        // Bottom
+        new THREE.Vector3(-viewport.width / 2 + marginX, 0, 0),        // Left
+        new THREE.Vector3(0, viewport.height / 2 - marginY, 0),        // Top
+        new THREE.Vector3(viewport.width / 2 - marginX, 0, 0)          // Right
     ];
 }
 
@@ -676,13 +687,81 @@ window.addEventListener('resize', () =>
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Oyuncuların pozisyonlarını güncelle
+    const viewport = calculateViewportDimensions(camera);
+
+    // More sophisticated responsive system based on actual screen dimensions
+    // iPhone 14: ~390px width, Nest Hub: ~1024px width
+    // Use viewport width to determine appropriate offset percentages
+    const screenWidth = window.innerWidth;
+    const isPortrait = viewport.height > viewport.width;
+
+    // Calculate dynamic offset based on screen width
+    // For narrow screens (like iPhone), use smaller offsets
+    // For wider screens (like tablets), use larger offsets
+    let baseOffset, horizontalMargin, verticalMargin;
+
+    if (screenWidth < 500)
+    {
+        // Very narrow screens (phones in portrait)
+        baseOffset = isPortrait ? 0.12 : 0.08;
+        horizontalMargin = isPortrait ? 0.95 : 0.9;
+        verticalMargin = isPortrait ? 0.9 : 0.8;
+    } else if (screenWidth < 800)
+    {
+        // Medium screens (larger phones, small tablets)
+        baseOffset = isPortrait ? 0.15 : 0.1;
+        horizontalMargin = isPortrait ? 0.93 : 0.9;
+        verticalMargin = isPortrait ? 0.85 : 0.8;
+    } else
+    {
+        // Large screens (tablets, desktop)
+        baseOffset = isPortrait ? 0.2 : 0.15;
+        horizontalMargin = isPortrait ? 0.9 : 0.85;
+        verticalMargin = isPortrait ? 0.8 : 0.75;
+    }
+
+    gameConfig.deckOffsetPercent = baseOffset;
+    gameConfig.pileOffsetPercent = baseOffset;
+    gameConfig.marginHorizPercent = horizontalMargin;
+    gameConfig.marginVertPercent = verticalMargin;
+
+    // re-calc player positions after margin change
     const positions = updatePlayerPositions();
     players.forEach((player, index) =>
     {
         player.position = positions[index];
-        player.arrangeCards(); // Kartları yeni pozisyona göre düzenle
+        player.arrangeCards();
     });
+
+    // Responsive deck and pile positions
+    gameConfig.deckPosition.set(-viewport.width * gameConfig.deckOffsetPercent, 0, 0);
+    gameConfig.pilePosition.set(viewport.width * gameConfig.pileOffsetPercent, 0, 0);
+
+    // Reposition deck cards
+    deck.forEach((card, index) =>
+    {
+        card.setPosition(gameConfig.deckPosition.x, gameConfig.deckPosition.y, 0.001 * index);
+        card.mesh.renderOrder = gameConfig.renderOrders.deck + index;
+    });
+    // Reposition pile card
+    if (gameState.pileTopCard)
+    {
+        gameState.pileTopCard.setPosition(
+            gameConfig.pilePosition.x,
+            gameConfig.pilePosition.y,
+            gameState.pileTopCard.mesh.position.z
+        );
+        gameState.pileTopCard.mesh.renderOrder = gameConfig.renderOrders.pile;
+    }
+    // Adjust deck hand sprite position
+    if (deckHandSprite)
+    {
+        const deckPos = gameConfig.deckPosition.clone();
+        deckHandSprite.position.set(deckPos.x - 1, deckPos.y + 0.5, deckPos.z + 0.5);
+    }
+
+    // Update card scaling and spacing
+    updateCardScalingAndSpacing();
 });
 
 // Basit tıklama etkileşimi için Raycaster
@@ -1674,3 +1753,36 @@ function showEndScreen()
         }
     });
 }
+
+// Function to update card scaling and spacing
+function updateCardScalingAndSpacing()
+{
+    const viewport = calculateViewportDimensions(camera);
+
+    // Calculate scale factor
+    const desiredCardWidth = viewport.width * gameConfig.cardWidthPercent;
+    const desiredCardHeight = viewport.height * gameConfig.cardHeightPercent;
+    const scaleX = desiredCardWidth / 3.375;
+    const scaleY = desiredCardHeight / 5.0625;
+    const scaleFactor = Math.min(scaleX, scaleY);
+
+    // Update card spacing based on card size (half of card width for overlap effect)
+    const actualCardWidth = 3.375 * scaleFactor;
+    gameConfig.cardSpacing = actualCardWidth * 0.5; // Cards overlap by half
+
+    // Scale all cards
+    deck.forEach(card => card.setScale(scaleFactor, scaleFactor, scaleFactor));
+    players.forEach(player =>
+    {
+        player.cards.forEach(card => card.setScale(scaleFactor, scaleFactor, scaleFactor));
+        // Re-arrange cards after spacing update
+        player.arrangeCards();
+    });
+    if (gameState.pileTopCard) gameState.pileTopCard.setScale(scaleFactor, scaleFactor, scaleFactor);
+}
+
+// Trigger initial responsive layout
+window.dispatchEvent(new Event('resize'));
+
+// Apply initial card scaling and spacing
+updateCardScalingAndSpacing();
