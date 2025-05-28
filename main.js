@@ -1543,10 +1543,25 @@ function removeDeckHandHint()
 function showEndScreen()
 {
     // Create EndCard
-    const endCardTexture = textureLoader.load('assets/EndCard.png');
+    const endCardTexture = textureLoader.load(
+        'assets/EndCard.png',
+        (texture) =>
+        {
+            const maxAni = renderer.capabilities.getMaxAnisotropy();
+            texture.anisotropy = maxAni;
+            texture.encoding = THREE.sRGBEncoding;
+            texture.minFilter = THREE.LinearMipMapLinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.generateMipmaps = true;
+        },
+        undefined,
+        (error) => console.error('EndCard texture load error:', error)
+    );
     const endCardMaterial = new THREE.MeshBasicMaterial({
         map: endCardTexture,
-        transparent: true
+        side: THREE.DoubleSide,
+        transparent: true,
+        alphaTest: 0.5
     });
 
     // Calculate EndCard size based on viewport
@@ -1561,10 +1576,25 @@ function showEndScreen()
     scene.add(endCard);
 
     // Create PlayButton
-    const playButtonTexture = textureLoader.load('assets/PlayButton.png');
+    const playButtonTexture = textureLoader.load(
+        'assets/PlayButton.png',
+        (texture) =>
+        {
+            const maxAni = renderer.capabilities.getMaxAnisotropy();
+            texture.anisotropy = maxAni;
+            texture.encoding = THREE.sRGBEncoding;
+            texture.minFilter = THREE.LinearMipMapLinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.generateMipmaps = true;
+        },
+        undefined,
+        (error) => console.error('PlayButton texture load error:', error)
+    );
     const playButtonMaterial = new THREE.MeshBasicMaterial({
         map: playButtonTexture,
-        transparent: true
+        side: THREE.DoubleSide,
+        transparent: true,
+        alphaTest: 0.5
     });
     const playButtonGeometry = new THREE.PlaneGeometry(5, 2.5); // Adjust size as needed
     const playButton = new THREE.Mesh(playButtonGeometry, playButtonMaterial);
