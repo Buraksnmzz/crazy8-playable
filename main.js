@@ -422,6 +422,11 @@ let deckHandSprite = null;
 let deckHandAnimation = null;
 let isDeckHintActive = false;
 
+// Playable card üzerindeki el imleci için değişkenler
+let cardHandSprite = null;
+let cardHandAnimation = null;
+let isCardHintActive = false;
+
 // Oyuncu pozisyonlarını güncelle
 function updatePlayerPositions()
 {
@@ -758,6 +763,27 @@ window.addEventListener('resize', () =>
     {
         const deckPos = gameConfig.deckPosition.clone();
         deckHandSprite.position.set(deckPos.x - 1, deckPos.y + 0.5, deckPos.z + 0.5);
+    }
+
+    // Adjust card hand sprite position if it exists
+    if (cardHandSprite && hintedCards.length > 0)
+    {
+        // Reposition based on the first hinted card
+        const firstHintedCard = hintedCards[0];
+        const cardPos = firstHintedCard.mesh.position.clone();
+        const cardScale = firstHintedCard.mesh.scale.x;
+
+        const xOffset = 0; // X ekseninde tam ortada
+        const yOffset = 0.8 * cardScale;  // Y ekseninde biraz yukarıda
+
+        cardHandSprite.position.set(
+            cardPos.x + xOffset,
+            cardPos.y + yOffset,
+            cardPos.z + 0.5
+        );
+
+        const handScale = 2.5 * cardScale;
+        cardHandSprite.scale.set(handScale, handScale, handScale);
     }
 
     // Update card scaling and spacing
@@ -1353,6 +1379,9 @@ function showHint()
                 hintedCards.push(card);
             });
 
+            // İlk oynanabilir kart üzerinde el işareti göster
+            createCardHandHint(playableCards[0]);
+
             // Oynanamayan kartları grileştir
             unplayableCards.forEach(card =>
             {
@@ -1398,6 +1427,9 @@ function resetHintedCard()
 
     // Deck üzerindeki el işaretini temizle
     removeDeckHandHint();
+
+    // Playable card üzerindeki el işaretini temizle
+    removeCardHandHint();
 
     // Eğer bekleyen bir timeout varsa temizle
     if (hintTimeout)
@@ -1454,8 +1486,9 @@ function handleDeckClick(currentPlayer)
     cardMoveAudio.play().catch(() => { });
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
-        // El işaretini kaldır
+        // El işaretlerini kaldır
         removeDeckHandHint();
+        removeCardHandHint();
 
         if (gameState.isDrawTwoActive)
         {
@@ -1635,6 +1668,92 @@ function removeDeckHandHint()
     isDeckHintActive = false;
 }
 
+// Playable card üzerinde el işareti oluştur ve göster
+function createCardHandHint(cardView)
+{
+    // Eğer zaten varsa önce temizle
+    removeCardHandHint();
+
+    // El sprite'ı için materyal oluştur
+    const handTexture = new THREE.TextureLoader().load('assets/hand.png');
+    const handMaterial = new THREE.SpriteMaterial({
+        map: handTexture,
+        transparent: true,
+        opacity: 1
+    });
+
+    // El sprite'ını oluştur
+    cardHandSprite = new THREE.Sprite(handMaterial);
+
+    // Pozisyonu kartın x ekseninde tam ortasında, y ekseninde biraz yukarıda olacak şekilde ayarla
+    const cardPos = cardView.mesh.position.clone();
+    const cardScale = cardView.mesh.scale.x; // Assume uniform scaling
+
+    // Kartın x ekseninde tam ortasında (offset yok), y ekseninde biraz yukarıda konumlandır
+    const xOffset = -1 * cardScale; // X ekseninde tam ortada
+    const yOffset = 4 * cardScale;  // Y ekseninde biraz yukarıda
+
+    cardHandSprite.position.set(
+        cardPos.x + xOffset,
+        cardPos.y + yOffset,
+        cardPos.z + 0.5
+    );
+
+    // El işaretini 90 derece sağa döndür (π/2 radians)
+    cardHandSprite.material.rotation = -Math.PI / 2;
+
+    // Boyutu ayarla (kartın ölçeğine göre)
+    const handScale = 2.5 * cardScale;
+    cardHandSprite.scale.set(handScale, handScale, handScale);
+
+    // Scene'e ekle
+    scene.add(cardHandSprite);
+
+    // Animasyon değişkenlerini ayarla
+    const baseY = cardPos.y + yOffset;
+    const amplitude = 0.3 * cardScale; // Yukarı-aşağı hareket miktarı
+    let animationTime = 0;
+
+    // Animasyon fonksiyonu
+    function animateCardHand()
+    {
+        // El işaretini yukarı-aşağı hareket ettir (sinüs dalgası)
+        animationTime += 0.05;
+        const yPosition = baseY + Math.sin(animationTime) * amplitude;
+
+        // Pozisyonu güncelle
+        cardHandSprite.position.y = yPosition;
+
+        // Animasyonu devam ettir
+        if (isCardHintActive)
+        {
+            cardHandAnimation = requestAnimationFrame(animateCardHand);
+        }
+    }
+
+    // Animasyonu başlat
+    isCardHintActive = true;
+    animateCardHand();
+}
+
+// Playable card üzerindeki el işaretini temizle
+function removeCardHandHint()
+{
+    if (cardHandSprite)
+    {
+        scene.remove(cardHandSprite);
+        cardHandSprite = null;
+    }
+
+    if (cardHandAnimation)
+    {
+        cancelAnimationFrame(cardHandAnimation);
+        cardHandAnimation = null;
+    }
+
+    isCardHintActive = false;
+}
+
 // Create end game screen with EndCard and PlayButton
 function showEndScreen()
 {
@@ -1662,9 +1781,19 @@ function showEndScreen()
 
     // Calculate EndCard size based on viewport
     const viewport = calculateViewportDimensions(camera);
-    const targetHeight = viewport.height * 0.4; // reduced from 0.5 to 0.3 for smaller display
-    const aspectRatio = 1.5; // EndCard aspect ratio (height/width)
-    const targetWidth = targetHeight / aspectRatio;
+    const aspectRatio = 1.5; // EndCard height/width ratio
+    // Start with height-based sizing
+    let targetHeight = viewport.height * 0.4; // 40% of viewport height
+    let targetWidth = targetHeight / aspectRatio;
+    // Clamp width if overflow on narrow screens
+    // Use tighter clamp on very narrow screens
+    const maxWidthPercent = viewport.width < 500 ? 0.4 : 0.8;
+    const maxWidth = viewport.width * maxWidthPercent; // 60% width on mobile, 80% otherwise
+    if (targetWidth > maxWidth)
+    {
+        targetWidth = maxWidth;
+        targetHeight = targetWidth * aspectRatio;
+    }
 
     const endCardGeometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
     const endCard = new THREE.Mesh(endCardGeometry, endCardMaterial);
