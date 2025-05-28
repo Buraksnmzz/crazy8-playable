@@ -967,6 +967,9 @@ class GameState
             if (deck.length > 0)
             {
                 const card = deck.pop();
+                // play card draw sound for each card
+                cardMoveAudio.currentTime = 0;
+                cardMoveAudio.play().catch(() => { });
                 // Her kartın animasyonını tamamlanmasını bekle
                 await new Promise(resolve =>
                 {
