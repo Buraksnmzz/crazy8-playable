@@ -1239,7 +1239,7 @@ class SuitSelectionUI
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.65);
             display: none;
             z-index: 999;
         `;
@@ -1264,7 +1264,7 @@ class SuitSelectionUI
         this.title.textContent = 'Select a Suit';
         this.title.style.cssText = `
             text-align: center;
-            font-size: 18px;
+            font-size: 20px;
             margin-bottom: 10px;
             color: white;
         `;
@@ -1966,6 +1966,21 @@ function showEndScreen()
         playButtonElement.classList.add('hidden');
     }
 
+    // Create overlay for endgame screen
+    const endGameOverlay = document.createElement('div');
+    endGameOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: -1;
+        pointer-events: none;
+    `;
+    endGameOverlay.id = 'endGameOverlay';
+    document.body.appendChild(endGameOverlay);
+
     // Play end card sound using SoundJS
     audioManager.playEndCardSound();
 
@@ -2089,6 +2104,12 @@ function showEndScreen()
 
             if (intersects.length > 0)
             {
+                // Remove the overlay before reloading
+                const overlay = document.getElementById('endGameOverlay');
+                if (overlay)
+                {
+                    overlay.remove();
+                }
                 location.reload(); // Restart game
             }
         }
