@@ -607,7 +607,7 @@ const gameConfig = {
     marginVertPercent: 0.8,                        // Vertical margin percent
     cardSpacing: 2,                                // Kartlar arası mesafe (will be updated dynamically)
     initialCardsPerPlayer: 3,                      // Her oyuncuya dağıtılacak kart sayısı
-    maxTotalTurns: 8,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
+    maxTotalTurns: 2,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
     // Card scaling targets
     cardWidthPercent: 0.2,                         // Kart genişliği: viewport genişliğinin yüzdesi
     cardHeightPercent: 0.35,                       // Kart yüksekliği: viewport yüksekliğinin yüzdesi
@@ -1803,6 +1803,12 @@ window.addEventListener('click', (event) =>
 
         if (intersects.length > 0)
         {
+            // Remove the overlay before restarting
+            const overlay = document.querySelector('.game-overlay');
+            if (overlay)
+            {
+                overlay.remove();
+            }
             location.reload(); // Restart game
             return;
         }
@@ -2171,6 +2177,11 @@ function repositionInitialPlayButton()
 // Create end game screen with EndCard and PlayButton
 function showEndScreen()
 {
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'game-overlay';
+    document.body.appendChild(overlay);
+
     // Play end card sound using SoundJS
     audioManager.playEndCardSound();
 
