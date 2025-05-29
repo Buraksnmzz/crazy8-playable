@@ -126,12 +126,14 @@ body {
         transform: translateX(-50%) translateZ(0);
         /* Use viewport units that work better on iOS */
         left: 50vw;
-        margin-left: -120px; /* Half of default button width (240px) */
+        margin-left: -120px;
+        /* Half of default button width (240px) */
     }
-    
+
     @media (max-width: 480px) {
         .play-button {
-            margin-left: -80px; /* Adjust for smaller screens */
+            margin-left: -80px;
+            /* Adjust for smaller screens */
         }
     }
 }
