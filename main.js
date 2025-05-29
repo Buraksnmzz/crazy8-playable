@@ -1785,8 +1785,7 @@ window.addEventListener('click', (event) =>
 
         if (intersects.length > 0)
         {
-            // Hide initial PlayButton and start the game
-            // Audio unlock and start background music
+            // Only start background music, do nothing else
             audioManager.playBackgroundMusic();
             return;
         }
@@ -1802,13 +1801,7 @@ window.addEventListener('click', (event) =>
 
         if (intersects.length > 0)
         {
-            // Remove the overlay before restarting
-            const overlay = document.querySelector('.game-overlay');
-            if (overlay)
-            {
-                overlay.remove();
-            }
-            location.reload(); // Restart game
+            // Do nothing when end screen play button is clicked
             return;
         }
     }
