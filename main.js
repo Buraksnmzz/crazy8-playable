@@ -1017,6 +1017,9 @@ window.addEventListener('resize', () =>
 
     // Update card scaling and spacing
     updateCardScalingAndSpacing();
+
+    // Reposition initial PlayButton if it exists
+    repositionInitialPlayButton();
 });
 
 // Basit tıklama etkileşimi için Raycaster
@@ -2008,15 +2011,26 @@ function showInitialPlayButton()
             texture.encoding = THREE.sRGBEncoding;
             texture.minFilter = THREE.LinearMipMapLinearFilter;
             texture.magFilter = THREE.LinearFilter;
-            texture.generateMipmaps = true;
-
-            const viewport = calculateViewportDimensions(camera);
+            texture.generateMipmaps = true; const viewport = calculateViewportDimensions(camera);
+            const isPortrait = viewport.height > viewport.width;
 
             // Compute aspect-ratio based button size
             const img = texture.image;
             const aspect = img.height / img.width;
-            const buttonWidth = viewport.width * 0.3; // 30% of viewport width
-            const buttonHeight = buttonWidth * aspect;
+
+            // Different button sizes for portrait vs landscape
+            let buttonWidth, buttonHeight;
+            if (isPortrait)
+            {
+                // Portrait: 30% of viewport width
+                buttonWidth = viewport.width * 0.3;
+                buttonHeight = buttonWidth * aspect;
+            } else
+            {
+                // Landscape: smaller button (20% of viewport width)
+                buttonWidth = viewport.width * 0.2;
+                buttonHeight = buttonWidth * aspect;
+            }
 
             const material = new THREE.MeshBasicMaterial({
                 map: texture,
@@ -2025,11 +2039,24 @@ function showInitialPlayButton()
                 alphaTest: 0.5
             });
 
-            const geometry = new THREE.PlaneGeometry(buttonWidth, buttonHeight);
-            playButton = new THREE.Mesh(geometry, material);
+            const geometry = new THREE.PlaneGeometry(buttonWidth, buttonHeight); playButton = new THREE.Mesh(geometry, material);
 
-            // Position PlayButton at bottom center
-            playButton.position.set(0, -viewport.height * 0.3, 5);
+            // Position PlayButton based on orientation
+            let buttonX, buttonY;
+            if (isPortrait)
+            {
+                // Portrait mode: bottom center
+                buttonX = 0;
+                buttonY = -viewport.height * 0.3;
+            } else
+            {
+                // Landscape mode: top-right with margin, positioned higher
+                const margin = viewport.width * 0.12; // 8% margin from edge (smaller margin)
+                buttonX = viewport.width / 2 - margin - buttonWidth / 2;
+                buttonY = viewport.height / 2 - margin / 2 - buttonHeight / 2; // Higher position (half the margin)
+            }
+
+            playButton.position.set(buttonX, buttonY, 5);
             scene.add(playButton);
 
             // Start animation
@@ -2087,6 +2114,58 @@ function hideInitialPlayButton()
     {
         playButtonAnimation = null;
     }
+}
+
+// Reposition initial PlayButton on orientation change
+function repositionInitialPlayButton()
+{
+    if (!playButton) return;
+
+    const viewport = calculateViewportDimensions(camera);
+    const isPortrait = viewport.height > viewport.width;
+
+    // Get current button size from geometry
+    const buttonWidth = playButton.geometry.parameters.width;
+    const buttonHeight = playButton.geometry.parameters.height;
+
+    // Check if we need to resize the button for different orientation
+    // Calculate expected size for current orientation
+    let expectedWidth;
+    if (isPortrait)
+    {
+        expectedWidth = viewport.width * 0.3; // 30% for portrait
+    } else
+    {
+        expectedWidth = viewport.width * 0.2; // 20% for landscape
+    }
+
+    // If button size doesn't match expected size, we need to recreate it
+    if (Math.abs(buttonWidth - expectedWidth) > 0.1)
+    {
+        // Remove old button
+        scene.remove(playButton);
+
+        // Recreate with correct size
+        showInitialPlayButton();
+        return;
+    }
+
+    // Just reposition existing button
+    let buttonX, buttonY;
+    if (isPortrait)
+    {
+        // Portrait mode: bottom center
+        buttonX = 0;
+        buttonY = -viewport.height * 0.3;
+    } else
+    {
+        // Landscape mode: top-right with margin, positioned higher
+        const margin = viewport.width * 0.08; // 8% margin from edge (smaller margin)
+        buttonX = viewport.width / 2 - margin - buttonWidth / 2;
+        buttonY = viewport.height / 2 - margin / 2 - buttonHeight / 2; // Higher position (half the margin)
+    }
+
+    playButton.position.set(buttonX, buttonY, 5);
 }
 
 // Create end game screen with EndCard and PlayButton
