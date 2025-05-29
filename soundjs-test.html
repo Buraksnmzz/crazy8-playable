@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoundJS vs HTML5 Audio Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: #e7f3ff;
+            border: 1px solid #bee5eb;
+        }
+        .error {
+            background: #ffe6e6;
+            border-color: #ffcccb;
+        }
+        .success {
+            background: #e6ffe6;
+            border-color: #ccffcc;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        @media (max-width: 600px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 SoundJS vs HTML5 Audio Performance Test</h1>
+    <p>This test compares the audio latency and performance between SoundJS and standard HTML5 Audio, especially on mobile devices.</p>
+
+    <div class="comparison">
+        <div class="test-section">
+            <h2>🎯 SoundJS Implementation</h2>
+            <div id="soundjs-status" class="status">Initializing SoundJS...</div>
+            <button id="soundjs-bg" disabled>Play Background Music</button>
+            <button id="soundjs-card" disabled>Play Card Sound</button>
+            <button id="soundjs-end" disabled>Play End Sound</button>
+            <button id="soundjs-stop">Stop All</button>
+            <button id="soundjs-mute">Toggle Mute</button>
+            <div>
+                <label>Volume: </label>
+                <input type="range" id="soundjs-volume" min="0" max="100" value="100">
+                <span id="soundjs-volume-display">100%</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔊 HTML5 Audio Implementation</h2>
+            <div id="html5-status" class="status">Initializing HTML5 Audio...</div>
+            <button id="html5-bg">Play Background Music</button>
+            <button id="html5-card">Play Card Sound</button>
+            <button id="html5-end">Play End Sound</button>
+            <button id="html5-stop">Stop All</button>
+            <button id="html5-mute">Toggle Mute</button>
+            <div>
+                <label>Volume: </label>
+                <input type="range" id="html5-volume" min="0" max="100" value="100">
+                <span id="html5-volume-display">100%</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📊 Performance Comparison</h2>
+        <p>Click the buttons above and notice the differences:</p>
+        <ul>
+            <li><strong>Latency:</strong> SoundJS typically has lower latency, especially on mobile</li>
+            <li><strong>Reliability:</strong> SoundJS handles cross-browser compatibility better</li>
+            <li><strong>Mobile Support:</strong> SoundJS provides better mobile audio unlocking</li>
+            <li><strong>Performance:</strong> SoundJS uses Web Audio API when available for better performance</li>
+        </ul>
+        <div id="performance-notes" class="status">
+            <strong>Notes:</strong> Test on both desktop and mobile devices. On mobile, you may need to interact with the page first to unlock audio.
+        </div>
+    </div>
+
+    <script src="https://code.createjs.com/1.0.0/soundjs.min.js"></script>
+    <script>
+        // SoundJS Implementation
+        class SoundJSManager {
+            constructor() {
+                this.sounds = {};
+                this.isInitialized = false;
+                this.isMuted = false;
+                this.init();
+            }
+
+            init() {
+                const statusEl = document.getElementById('soundjs-status');
+                
+                if (!createjs.Sound.initializeDefaultPlugins()) {
+                    statusEl.textContent = "❌ SoundJS failed to initialize";
+                    statusEl.className = "status error";
+                    return;
+                }
+
+                // Register sounds
+                createjs.Sound.registerSound("assets/backmusic.mp3", "bg");
+                createjs.Sound.registerSound("assets/CardMove.mp3", "card");
+                createjs.Sound.registerSound("assets/endcardsound.mp3", "end");
+
+                createjs.Sound.on("fileload", (event) => {
+                    console.log("SoundJS loaded:", event.id);
+                });
+
+                createjs.Sound.on("fileerror", (event) => {
+                    console.error("SoundJS error:", event.id);
+                });
+
+                // Mobile unlock
+                const unlock = () => {
+                    if (this.isInitialized) return;
+                    const instance = createjs.Sound.play("card", { volume: 0 });
+                    if (instance) {
+                        instance.stop();
+                        this.isInitialized = true;
+                        statusEl.textContent = "✅ SoundJS ready (Web Audio: " + 
+                            (createjs.Sound.activePlugin instanceof createjs.WebAudioPlugin) + ")";
+                        statusEl.className = "status success";
+                        this.enableButtons();
+                    }
+                };
+
+                document.addEventListener('click', unlock, { once: true });
+                document.addEventListener('touchstart', unlock, { once: true });
+
+                statusEl.textContent = "⏳ Click anywhere to unlock SoundJS audio";
+            }
+
+            enableButtons() {
+                document.getElementById('soundjs-bg').disabled = false;
+                document.getElementById('soundjs-card').disabled = false;
+                document.getElementById('soundjs-end').disabled = false;
+            }
+
+            playBG() {
+                if (!this.isInitialized) return;
+                this.stopBG();
+                this.sounds.bg = createjs.Sound.play("bg", { loop: -1, volume: 0.6 });
+            }
+
+            playCard() {
+                if (!this.isInitialized) return;
+                createjs.Sound.play("card");
+            }
+
+            playEnd() {
+                if (!this.isInitialized) return;
+                createjs.Sound.play("end");
+            }
+
+            stopBG() {
+                if (this.sounds.bg) {
+                    this.sounds.bg.stop();
+                    this.sounds.bg = null;
+                }
+            }
+
+            stopAll() {
+                createjs.Sound.stop();
+                this.sounds = {};
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                createjs.Sound.setMute(this.isMuted);
+                return this.isMuted;
+            }
+
+            setVolume(volume) {
+                createjs.Sound.setVolume(volume / 100);
+            }
+        }
+
+        // HTML5 Audio Implementation
+        class HTML5AudioManager {
+            constructor() {
+                this.bgAudio = new Audio('assets/backmusic.mp3');
+                this.cardAudio = new Audio('assets/CardMove.mp3');
+                this.endAudio = new Audio('assets/endcardsound.mp3');
+                this.isMuted = false;
+                this.init();
+            }
+
+            init() {
+                const statusEl = document.getElementById('html5-status');
+                
+                this.bgAudio.loop = true;
+                this.bgAudio.preload = 'auto';
+                this.cardAudio.preload = 'auto';
+                this.endAudio.preload = 'auto';
+
+                // Mobile unlock
+                const unlock = () => {
+                    this.bgAudio.play().then(() => {
+                        this.bgAudio.pause();
+                        this.bgAudio.currentTime = 0;
+                        statusEl.textContent = "✅ HTML5 Audio ready";
+                        statusEl.className = "status success";
+                    }).catch((e) => {
+                        statusEl.textContent = "❌ HTML5 Audio unlock failed: " + e.message;
+                        statusEl.className = "status error";
+                    });
+                };
+
+                document.addEventListener('click', unlock, { once: true });
+                document.addEventListener('touchstart', unlock, { once: true });
+
+                statusEl.textContent = "⏳ Click anywhere to unlock HTML5 audio";
+            }
+
+            playBG() {
+                this.bgAudio.currentTime = 0;
+                this.bgAudio.play().catch(e => console.error('HTML5 BG error:', e));
+            }
+
+            playCard() {
+                this.cardAudio.currentTime = 0;
+                this.cardAudio.play().catch(e => console.error('HTML5 card error:', e));
+            }
+
+            playEnd() {
+                this.endAudio.currentTime = 0;
+                this.endAudio.play().catch(e => console.error('HTML5 end error:', e));
+            }
+
+            stopAll() {
+                this.bgAudio.pause();
+                this.cardAudio.pause();
+                this.endAudio.pause();
+            }
+
+            toggleMute() {
+                this.isMuted = !this.isMuted;
+                this.bgAudio.muted = this.isMuted;
+                this.cardAudio.muted = this.isMuted;
+                this.endAudio.muted = this.isMuted;
+                return this.isMuted;
+            }
+
+            setVolume(volume) {
+                const vol = volume / 100;
+                this.bgAudio.volume = vol;
+                this.cardAudio.volume = vol;
+                this.endAudio.volume = vol;
+            }
+        }
+
+        // Initialize both systems
+        const soundjsManager = new SoundJSManager();
+        const html5Manager = new HTML5AudioManager();
+
+        // Event listeners
+        document.getElementById('soundjs-bg').onclick = () => soundjsManager.playBG();
+        document.getElementById('soundjs-card').onclick = () => soundjsManager.playCard();
+        document.getElementById('soundjs-end').onclick = () => soundjsManager.playEnd();
+        document.getElementById('soundjs-stop').onclick = () => soundjsManager.stopAll();
+        document.getElementById('soundjs-mute').onclick = (e) => {
+            const muted = soundjsManager.toggleMute();
+            e.target.textContent = muted ? 'Unmute' : 'Toggle Mute';
+        };
+
+        document.getElementById('html5-bg').onclick = () => html5Manager.playBG();
+        document.getElementById('html5-card').onclick = () => html5Manager.playCard();
+        document.getElementById('html5-end').onclick = () => html5Manager.playEnd();
+        document.getElementById('html5-stop').onclick = () => html5Manager.stopAll();
+        document.getElementById('html5-mute').onclick = (e) => {
+            const muted = html5Manager.toggleMute();
+            e.target.textContent = muted ? 'Unmute' : 'Toggle Mute';
+        };
+
+        // Volume controls
+        document.getElementById('soundjs-volume').oninput = (e) => {
+            soundjsManager.setVolume(e.target.value);
+            document.getElementById('soundjs-volume-display').textContent = e.target.value + '%';
+        };
+
+        document.getElementById('html5-volume').oninput = (e) => {
+            html5Manager.setVolume(e.target.value);
+            document.getElementById('html5-volume-display').textContent = e.target.value + '%';
+        };
+    </script>
+</body>
+</html>

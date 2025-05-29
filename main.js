@@ -24,28 +24,188 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000, 0); // Arka planı tamamen şeffaf yap
 renderer.sortObjects = false; // renderOrder değerlerinin tam olarak uygulanması için
 document.body.appendChild(renderer.domElement);
-// initialize interaction audio
-const interactionAudio = new Audio('assets/backmusic.mp3');
-interactionAudio.loop = true;
-// initialize card move sound effect
-const cardMoveAudio = new Audio('assets/CardMove.mp3');
 
-// Preload audio and unlock on first user interaction to enable mobile playback
-interactionAudio.preload = 'auto';
-interactionAudio.load();
-cardMoveAudio.preload = 'auto';
-cardMoveAudio.load();
+// SoundJS Audio Manager
+class AudioManager {
+    constructor() {
+        this.sounds = {};
+        this.isInitialized = false;
+        this.isMuted = false;
+        this.masterVolume = 1.0;
+        this.initializeAudio();
+    }
 
-let audioUnlocked = false;
-function unlockAudio()
-{
-    if (audioUnlocked) return;
-    interactionAudio.play().catch(() => { });
-    cardMoveAudio.play().catch(() => { });
-    document.body.removeEventListener('touchstart', unlockAudio);
-    audioUnlocked = true;
+    initializeAudio() {
+        // Initialize SoundJS with preferred plugins (Web Audio API first, then HTML5)
+        createjs.Sound.alternateExtensions = ["mp3"];
+        
+        if (!createjs.Sound.initializeDefaultPlugins()) {
+            console.error("SoundJS could not initialize any audio plugins");
+            return;
+        }
+
+        // Set capabilities for better mobile performance
+        createjs.Sound.registerPlugins([
+            createjs.WebAudioPlugin, 
+            createjs.HTMLAudioPlugin
+        ]);
+
+        // Register sound files
+        this.registerSounds();
+        
+        // Set up mobile audio unlock
+        this.setupMobileAudioUnlock();
+    }
+
+    registerSounds() {
+        // Register all sound files with SoundJS with improved settings
+        createjs.Sound.registerSound({
+            src: "assets/backmusic.mp3",
+            id: "backgroundMusic"
+        });
+        
+        createjs.Sound.registerSound({
+            src: "assets/CardMove.mp3", 
+            id: "cardMove"
+        });
+        
+        createjs.Sound.registerSound({
+            src: "assets/endcardsound.mp3", 
+            id: "endCardSound"
+        });
+        
+        // Listen for successful loads
+        createjs.Sound.on("fileload", this.handleSoundLoad.bind(this));
+        createjs.Sound.on("fileerror", this.handleSoundError.bind(this));
+    }
+
+    handleSoundLoad(event) {
+        console.log("Sound loaded:", event.id);
+        
+        // Start background music when it's loaded and audio is unlocked
+        if (event.id === "backgroundMusic" && this.isInitialized) {
+            this.playBackgroundMusic();
+        }
+    }
+
+    handleSoundError(event) {
+        console.error("Sound load error:", event.id, event.data);
+    }
+
+    setupMobileAudioUnlock() {
+        // Mobile audio unlock - SoundJS handles this better but we still need user interaction
+        const unlockAudio = () => {
+            if (this.isInitialized) return;
+            
+            try {
+                // Play a silent sound to unlock audio context
+                const instance = createjs.Sound.play("cardMove", { volume: 0 });
+                if (instance) {
+                    instance.stop();
+                    this.isInitialized = true;
+                    this.playBackgroundMusic();
+                    console.log("Audio unlocked successfully");
+                }
+            } catch (error) {
+                console.log("Audio unlock failed, will retry on next interaction");
+            }
+            
+            // Remove listeners only if successfully unlocked
+            if (this.isInitialized) {
+                document.body.removeEventListener('touchstart', unlockAudio);
+                document.body.removeEventListener('click', unlockAudio);
+            }
+        };
+
+        document.body.addEventListener('touchstart', unlockAudio, { once: true });
+        document.body.addEventListener('click', unlockAudio, { once: true });
+    }
+
+    playBackgroundMusic() {
+        if (!this.isInitialized || this.isMuted) return;
+        
+        // Stop any existing background music
+        if (this.sounds.backgroundMusic) {
+            this.sounds.backgroundMusic.stop();
+        }
+        
+        // Play background music with loop
+        this.sounds.backgroundMusic = createjs.Sound.play("backgroundMusic", {
+            loop: -1, // Infinite loop
+            volume: 0.6 * this.masterVolume // Slightly lower volume for background
+        });
+        
+        if (this.sounds.backgroundMusic) {
+            console.log("Background music started");
+        }
+    }
+
+    playCardMove() {
+        if (!this.isInitialized || this.isMuted) return;
+        
+        // Play card move sound with slight volume variation for realism
+        const volume = (0.7 + (Math.random() * 0.3)) * this.masterVolume; // Random volume between 0.7-1.0
+        const instance = createjs.Sound.play("cardMove", { volume: volume });
+        
+        // Add subtle pitch variation for more natural sound
+        if (instance && instance.playState === createjs.Sound.PLAY_SUCCEEDED) {
+            // Slightly vary playback rate for more natural feel (only works with Web Audio)
+            if (createjs.Sound.activePlugin instanceof createjs.WebAudioPlugin) {
+                const pitchVariation = 0.9 + (Math.random() * 0.2); // 0.9 to 1.1
+                try {
+                    instance.playbackRate = pitchVariation;
+                } catch (e) {
+                    // Ignore if playbackRate is not supported
+                }
+            }
+        }
+    }
+
+    playEndCardSound() {
+        if (!this.isInitialized || this.isMuted) return;
+        
+        createjs.Sound.play("endCardSound", { volume: 0.8 * this.masterVolume });
+    }
+
+    stopBackgroundMusic() {
+        if (this.sounds.backgroundMusic) {
+            this.sounds.backgroundMusic.stop();
+            this.sounds.backgroundMusic = null;
+        }
+    }
+
+    setMasterVolume(volume) {
+        this.masterVolume = Math.max(0, Math.min(1, volume)); // Clamp between 0 and 1
+        createjs.Sound.setVolume(this.masterVolume);
+        
+        // Update background music volume if playing
+        if (this.sounds.backgroundMusic) {
+            this.sounds.backgroundMusic.volume = 0.6 * this.masterVolume;
+        }
+    }
+
+    toggleMute() {
+        this.isMuted = !this.isMuted;
+        if (this.isMuted) {
+            this.stopBackgroundMusic();
+            createjs.Sound.setMute(true);
+        } else {
+            createjs.Sound.setMute(false);
+            this.playBackgroundMusic();
+        }
+        return this.isMuted;
+    }
+
+    // Preload all sounds for better performance
+    preloadAll() {
+        createjs.Sound.registerSound("assets/backmusic.mp3", "backgroundMusic");
+        createjs.Sound.registerSound("assets/CardMove.mp3", "cardMove");
+        createjs.Sound.registerSound("assets/endcardsound.mp3", "endCardSound");
+    }
 }
-document.body.addEventListener('touchstart', unlockAudio, { once: true });
+
+// Create global audio manager instance
+const audioManager = new AudioManager();
 
 // Kart Türleri (Suits) - Dosya adlarıyla eşleşecek şekilde (örn: Spade01.png)
 const Suit = {
@@ -972,9 +1132,8 @@ class GameState
             if (deck.length > 0)
             {
                 const card = deck.pop();
-                // play card draw sound for each card
-                cardMoveAudio.currentTime = 0;
-                cardMoveAudio.play().catch(() => { });
+                // play card draw sound for each card using SoundJS
+                audioManager.playCardMove();
                 // Her kartın animasyonını tamamlanmasını bekle
                 await new Promise(resolve =>
                 {
@@ -1188,8 +1347,8 @@ const suitSelectionUI = new SuitSelectionUI();
 // Event handler for card selection
 function handleCardClick(cardView)
 {
-    // play interaction sound
-    interactionAudio.play().catch(() => { });
+    // play interaction sound using SoundJS
+    audioManager.playBackgroundMusic();
 
     const currentPlayer = players[gameState.currentPlayerIndex];
 
@@ -1222,9 +1381,8 @@ function playCard(cardView, player)
 {
     // Remove the playable card hand hint as soon as the card is played
     removeCardHandHint();
-    // play card movement sound
-    cardMoveAudio.currentTime = 0;
-    cardMoveAudio.play().catch(() => { });
+    // play card movement sound using SoundJS
+    audioManager.playCardMove();
     // Remove card from player's hand
     const cardIndex = player.cards.indexOf(cardView);
     if (cardIndex > -1)
@@ -1327,9 +1485,8 @@ function handleAITurn()
                 if (deck.length > 0)
                 {
                     const drawnCard = deck.pop();
-                    // play draw card sound for AI
-                    cardMoveAudio.currentTime = 0;
-                    cardMoveAudio.play().catch(() => { });
+                    // play draw card sound for AI using SoundJS
+                    audioManager.playCardMove();
                     currentPlayer.addCard(drawnCard);
 
                     // Check if drawn card can be played
@@ -1487,9 +1644,8 @@ function animateInvalidMove(cardView)
 // Deck tıklama işleyicisi
 function handleDeckClick(currentPlayer)
 {
-    // play draw card sound
-    cardMoveAudio.currentTime = 0;
-    cardMoveAudio.play().catch(() => { });
+    // play draw card sound using SoundJS
+    audioManager.playCardMove();
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
         // El işaretlerini kaldır
@@ -1774,9 +1930,8 @@ function showEndScreen()
         playButtonElement.classList.add('hidden');
     }
 
-    // Play end card sound
-    const endCardAudio = new Audio('assets/endcardsound.mp3');
-    endCardAudio.play().catch(() => { });
+    // Play end card sound using SoundJS
+    audioManager.playEndCardSound();
 
     // Create EndCard
     const endCardTexture = textureLoader.load(
