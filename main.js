@@ -26,8 +26,10 @@ renderer.sortObjects = false; // renderOrder değerlerinin tam olarak uygulanmas
 document.body.appendChild(renderer.domElement);
 
 // SoundJS Audio Manager
-class AudioManager {
-    constructor() {
+class AudioManager
+{
+    constructor()
+    {
         this.sounds = {};
         this.isInitialized = false;
         this.isMuted = false;
@@ -35,83 +37,95 @@ class AudioManager {
         this.initializeAudio();
     }
 
-    initializeAudio() {
+    initializeAudio()
+    {
         // Initialize SoundJS with preferred plugins (Web Audio API first, then HTML5)
         createjs.Sound.alternateExtensions = ["mp3"];
-        
-        if (!createjs.Sound.initializeDefaultPlugins()) {
+
+        if (!createjs.Sound.initializeDefaultPlugins())
+        {
             console.error("SoundJS could not initialize any audio plugins");
             return;
         }
 
         // Set capabilities for better mobile performance
         createjs.Sound.registerPlugins([
-            createjs.WebAudioPlugin, 
+            createjs.WebAudioPlugin,
             createjs.HTMLAudioPlugin
         ]);
 
         // Register sound files
         this.registerSounds();
-        
+
         // Set up mobile audio unlock
         this.setupMobileAudioUnlock();
     }
 
-    registerSounds() {
+    registerSounds()
+    {
         // Register all sound files with SoundJS with improved settings
         createjs.Sound.registerSound({
             src: "assets/backmusic.mp3",
             id: "backgroundMusic"
         });
-        
+
         createjs.Sound.registerSound({
-            src: "assets/CardMove.mp3", 
+            src: "assets/CardMove.mp3",
             id: "cardMove"
         });
-        
+
         createjs.Sound.registerSound({
-            src: "assets/endcardsound.mp3", 
+            src: "assets/endcardsound.mp3",
             id: "endCardSound"
         });
-        
+
         // Listen for successful loads
         createjs.Sound.on("fileload", this.handleSoundLoad.bind(this));
         createjs.Sound.on("fileerror", this.handleSoundError.bind(this));
     }
 
-    handleSoundLoad(event) {
+    handleSoundLoad(event)
+    {
         console.log("Sound loaded:", event.id);
-        
+
         // Start background music when it's loaded and audio is unlocked
-        if (event.id === "backgroundMusic" && this.isInitialized) {
+        if (event.id === "backgroundMusic" && this.isInitialized)
+        {
             this.playBackgroundMusic();
         }
     }
 
-    handleSoundError(event) {
+    handleSoundError(event)
+    {
         console.error("Sound load error:", event.id, event.data);
     }
 
-    setupMobileAudioUnlock() {
+    setupMobileAudioUnlock()
+    {
         // Mobile audio unlock - SoundJS handles this better but we still need user interaction
-        const unlockAudio = () => {
+        const unlockAudio = () =>
+        {
             if (this.isInitialized) return;
-            
-            try {
+
+            try
+            {
                 // Play a silent sound to unlock audio context
                 const instance = createjs.Sound.play("cardMove", { volume: 0 });
-                if (instance) {
+                if (instance)
+                {
                     instance.stop();
                     this.isInitialized = true;
                     this.playBackgroundMusic();
                     console.log("Audio unlocked successfully");
                 }
-            } catch (error) {
+            } catch (error)
+            {
                 console.log("Audio unlock failed, will retry on next interaction");
             }
-            
+
             // Remove listeners only if successfully unlocked
-            if (this.isInitialized) {
+            if (this.isInitialized)
+            {
                 document.body.removeEventListener('touchstart', unlockAudio);
                 document.body.removeEventListener('click', unlockAudio);
             }
@@ -121,75 +135,91 @@ class AudioManager {
         document.body.addEventListener('click', unlockAudio, { once: true });
     }
 
-    playBackgroundMusic() {
+    playBackgroundMusic()
+    {
         if (!this.isInitialized || this.isMuted) return;
-        
+
         // Stop any existing background music
-        if (this.sounds.backgroundMusic) {
+        if (this.sounds.backgroundMusic)
+        {
             this.sounds.backgroundMusic.stop();
         }
-        
+
         // Play background music with loop
         this.sounds.backgroundMusic = createjs.Sound.play("backgroundMusic", {
             loop: -1, // Infinite loop
             volume: 0.6 * this.masterVolume // Slightly lower volume for background
         });
-        
-        if (this.sounds.backgroundMusic) {
+
+        if (this.sounds.backgroundMusic)
+        {
             console.log("Background music started");
         }
     }
 
-    playCardMove() {
+    playCardMove()
+    {
         if (!this.isInitialized || this.isMuted) return;
-        
+
         // Play card move sound with slight volume variation for realism
         const volume = (0.7 + (Math.random() * 0.3)) * this.masterVolume; // Random volume between 0.7-1.0
         const instance = createjs.Sound.play("cardMove", { volume: volume });
-        
+
         // Add subtle pitch variation for more natural sound
-        if (instance && instance.playState === createjs.Sound.PLAY_SUCCEEDED) {
+        if (instance && instance.playState === createjs.Sound.PLAY_SUCCEEDED)
+        {
             // Slightly vary playback rate for more natural feel (only works with Web Audio)
-            if (createjs.Sound.activePlugin instanceof createjs.WebAudioPlugin) {
+            if (createjs.Sound.activePlugin instanceof createjs.WebAudioPlugin)
+            {
                 const pitchVariation = 0.9 + (Math.random() * 0.2); // 0.9 to 1.1
-                try {
+                try
+                {
                     instance.playbackRate = pitchVariation;
-                } catch (e) {
+                } catch (e)
+                {
                     // Ignore if playbackRate is not supported
                 }
             }
         }
     }
 
-    playEndCardSound() {
+    playEndCardSound()
+    {
         if (!this.isInitialized || this.isMuted) return;
-        
+
         createjs.Sound.play("endCardSound", { volume: 0.8 * this.masterVolume });
     }
 
-    stopBackgroundMusic() {
-        if (this.sounds.backgroundMusic) {
+    stopBackgroundMusic()
+    {
+        if (this.sounds.backgroundMusic)
+        {
             this.sounds.backgroundMusic.stop();
             this.sounds.backgroundMusic = null;
         }
     }
 
-    setMasterVolume(volume) {
+    setMasterVolume(volume)
+    {
         this.masterVolume = Math.max(0, Math.min(1, volume)); // Clamp between 0 and 1
         createjs.Sound.setVolume(this.masterVolume);
-        
+
         // Update background music volume if playing
-        if (this.sounds.backgroundMusic) {
+        if (this.sounds.backgroundMusic)
+        {
             this.sounds.backgroundMusic.volume = 0.6 * this.masterVolume;
         }
     }
 
-    toggleMute() {
+    toggleMute()
+    {
         this.isMuted = !this.isMuted;
-        if (this.isMuted) {
+        if (this.isMuted)
+        {
             this.stopBackgroundMusic();
             createjs.Sound.setMute(true);
-        } else {
+        } else
+        {
             createjs.Sound.setMute(false);
             this.playBackgroundMusic();
         }
@@ -197,7 +227,8 @@ class AudioManager {
     }
 
     // Preload all sounds for better performance
-    preloadAll() {
+    preloadAll()
+    {
         createjs.Sound.registerSound("assets/backmusic.mp3", "backgroundMusic");
         createjs.Sound.registerSound("assets/CardMove.mp3", "cardMove");
         createjs.Sound.registerSound("assets/endcardsound.mp3", "endCardSound");
