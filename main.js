@@ -1239,7 +1239,7 @@ class SuitSelectionUI
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0);
+            background: rgba(0, 0, 0, 0.75);
             display: none;
             z-index: 999;
         `;
@@ -1251,60 +1251,65 @@ class SuitSelectionUI
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
+            background: transparent;
+            padding: 15px;
             border-radius: 10px;
             display: none;
             z-index: 1001;
+            width: 220px;
+            height: 240px;
         `;
 
         this.title = document.createElement('div');
         this.title.textContent = 'Select a Suit';
         this.title.style.cssText = `
             text-align: center;
-            font-size: 20px;
-            margin-bottom: 15px;
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: white;
         `;
 
         this.buttonsContainer = document.createElement('div');
         this.buttonsContainer.style.cssText = `
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 1px;
+            justify-items: center;
+            align-items: center;
+            height: 170px;
         `;
 
-        // Create buttons for each suit
+        // Create buttons for each suit with images
         const suits = [
-            { name: 'Hearts', color: '#ff0000' },  // red
-            { name: 'Diamonds', color: '#0000ff' }, // blue
-            { name: 'Clubs', color: '#800080' },   // purple
-            { name: 'Spades', color: '#008000' }   // green
+            { name: 'Hearts', image: 'assets/heartButton.png' },
+            { name: 'Diamonds', image: 'assets/diamondButton.png' },
+            { name: 'Clubs', image: 'assets/clubButton.png' },
+            { name: 'Spades', image: 'assets/spadeButton.png' }
         ];
 
         suits.forEach(suit =>
         {
-            const button = document.createElement('button');
-            button.textContent = suit.name;
+            const button = document.createElement('div');
             button.style.cssText = `
-                padding: 10px 20px;
-                font-size: 16px;
-                color: ${suit.color};
-                background: white;
-                border: 2px solid ${suit.color};
-                border-radius: 5px;
+                width: 80px;
+                height: 80px;
                 cursor: pointer;
+                transition: transform 0.2s ease;
+                background-image: url('${suit.image}');
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                border-radius: 10px;
             `;
 
             button.addEventListener('mouseover', () =>
             {
-                button.style.background = suit.color;
-                button.style.color = 'white';
+                button.style.transform = 'scale(1.1)';
             });
 
             button.addEventListener('mouseout', () =>
             {
-                button.style.background = 'white';
-                button.style.color = suit.color;
+                button.style.transform = 'scale(1)';
             });
 
             button.addEventListener('click', (event) =>
