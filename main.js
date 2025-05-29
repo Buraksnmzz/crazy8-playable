@@ -1767,6 +1767,13 @@ function removeCardHandHint()
 // Create end game screen with EndCard and PlayButton
 function showEndScreen()
 {
+    // Hide the play button when end screen appears
+    const playButtonElement = document.getElementById('playButton');
+    if (playButtonElement)
+    {
+        playButtonElement.classList.add('hidden');
+    }
+
     // Play end card sound
     const endCardAudio = new Audio('assets/endcardsound.mp3');
     endCardAudio.play().catch(() => { });

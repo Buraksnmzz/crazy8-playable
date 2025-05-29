@@ -78,3 +78,40 @@ body {
 .suit-selection button:hover {
     transform: scale(1.05);
 }
+
+/* Play Button */
+.play-button {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    cursor: pointer;
+    animation: scaleUpDown 2s ease-in-out infinite;
+}
+
+.play-button img {
+    display: block;
+    width: 240px;
+    height: auto;
+    max-width: 30vw;
+    min-width: 160px;
+}
+
+/* Scale up-down animation */
+@keyframes scaleUpDown {
+
+    0%,
+    100% {
+        transform: translateX(-50%) scale(1);
+    }
+
+    50% {
+        transform: translateX(-50%) scale(1.1);
+    }
+}
+
+/* Hide play button when end screen is shown */
+.play-button.hidden {
+    display: none;
+}
