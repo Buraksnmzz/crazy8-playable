@@ -607,7 +607,7 @@ const gameConfig = {
     marginVertPercent: 0.8,                        // Vertical margin percent
     cardSpacing: 2,                                // Kartlar arası mesafe (will be updated dynamically)
     initialCardsPerPlayer: 3,                      // Her oyuncuya dağıtılacak kart sayısı
-    maxTotalTurns: 2,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
+    maxTotalTurns: 8,                              // Toplam tur sayısı (8 tur × 4 oyuncu)
     // Card scaling targets
     cardWidthPercent: 0.2,                         // Kart genişliği: viewport genişliğinin yüzdesi
     cardHeightPercent: 0.35,                       // Kart yüksekliği: viewport yüksekliğinin yüzdesi
