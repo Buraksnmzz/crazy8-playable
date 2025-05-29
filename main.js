@@ -31,59 +31,72 @@ interactionAudio.setAttribute('playsinline', 'true');
 interactionAudio.setAttribute('webkit-playsinline', 'true');
 interactionAudio.preload = 'auto';
 interactionAudio.load();
-class AudioPool {
-    constructor(src, poolSize = 8) {
+class AudioPool
+{
+    constructor(src, poolSize = 8)
+    {
         this.pool = [];
         this.currentIndex = 0;
-        
+
         // Create multiple audio instances
-        for (let i = 0; i < poolSize; i++) {
+        for (let i = 0; i < poolSize; i++)
+        {
             const audio = new Audio(src);
             audio.preload = 'auto';
             audio.volume = 1.0;
-            
+
             // Mobile optimizations
             audio.setAttribute('playsinline', 'true');
             audio.setAttribute('webkit-playsinline', 'true');
-            
+
             // Load each instance
             audio.load();
             this.pool.push(audio);
         }
     }
-    
-    play() {
+
+    play()
+    {
         const audio = this.pool[this.currentIndex];
-        
+
         // Use a more efficient approach for mobile
-        if (audio.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+        if (audio.readyState >= 2)
+        { // HAVE_CURRENT_DATA or higher
             // Reset to beginning only if necessary
-            if (audio.currentTime > 0.1) {
+            if (audio.currentTime > 0.1)
+            {
                 audio.currentTime = 0;
             }
-            
+
             // Play the current audio instance
             const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
+            if (playPromise !== undefined)
+            {
+                playPromise.catch(error =>
+                {
                     console.warn('Audio play failed:', error);
                 });
             }
         }
-        
+
         // Move to next instance in pool
         this.currentIndex = (this.currentIndex + 1) % this.pool.length;
     }
-    
+
     // Unlock all audio instances for mobile
-    unlockAll() {
-        this.pool.forEach(audio => {
+    unlockAll()
+    {
+        this.pool.forEach(audio =>
+        {
             const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
+            if (playPromise !== undefined)
+            {
+                playPromise.then(() =>
+                {
                     audio.pause();
                     audio.currentTime = 0;
-                }).catch(() => {
+                }).catch(() =>
+                {
                     // Silently handle unlock failures
                 });
             }
@@ -113,7 +126,8 @@ document.body.addEventListener('click', unlockAudio, { once: true });
 window.addEventListener('focus', unlockAudio, { once: true });
 
 // Additional mobile audio context unlock
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () =>
+{
     // Force audio context unlock on load for some mobile browsers
     setTimeout(unlockAudio, 100);
 });
