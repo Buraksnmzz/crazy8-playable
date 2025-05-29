@@ -2025,7 +2025,38 @@ function showEndScreen()
     const endCardGeometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
     const endCard = new THREE.Mesh(endCardGeometry, endCardMaterial);
     endCard.position.set(0, 0, 10);  // Center end card on screen
+
+    // Start with scale 0 for popup animation
+    endCard.scale.set(0, 0, 0);
     scene.add(endCard);
+
+    // Animate endcard scale from 0 to 1
+    const animationDuration = 0.6; // 600ms animation
+    const startTime = Date.now();
+
+    function animateEndCardScale()
+    {
+        const currentTime = Date.now();
+        const elapsed = (currentTime - startTime) / 1000; // Convert to seconds
+        const progress = Math.min(elapsed / animationDuration, 1);
+
+        if (progress < 1)
+        {
+            // Use easeOutBack for a nice bounce effect
+            const easedProgress = Easing.easeOutBack(progress);
+            const scale = easedProgress;
+
+            endCard.scale.set(scale, scale, scale);
+            requestAnimationFrame(animateEndCardScale);
+        } else
+        {
+            // Ensure we end exactly at scale 1
+            endCard.scale.set(1, 1, 1);
+        }
+    }
+
+    // Start the scale animation
+    animateEndCardScale();
 
     // Create PlayButton
     let playButton; // declare PlayButton mesh for animation
