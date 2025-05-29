@@ -90,6 +90,17 @@ body {
     animation: scaleUpDown 2s ease-in-out infinite;
 }
 
+/* Play Button in landscape mode - move to top right */
+@media (orientation: landscape) {
+    .play-button {
+        top: 20px;
+        right: 20px;
+        bottom: auto;
+        left: auto;
+        transform: none;
+    }
+}
+
 .play-button img {
     display: block;
     width: 240px;
@@ -108,6 +119,21 @@ body {
 
     50% {
         transform: translateX(-50%) scale(1.1);
+    }
+}
+
+/* Scale animation for landscape mode */
+@media (orientation: landscape) {
+    @keyframes scaleUpDown {
+
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.1);
+        }
     }
 }
 
