@@ -27,25 +27,96 @@ document.body.appendChild(renderer.domElement);
 // initialize interaction audio
 const interactionAudio = new Audio('assets/backmusic.mp3');
 interactionAudio.loop = true;
-// initialize card move sound effect
-const cardMoveAudio = new Audio('assets/CardMove.mp3');
-
-// Preload audio and unlock on first user interaction to enable mobile playback
+interactionAudio.setAttribute('playsinline', 'true');
+interactionAudio.setAttribute('webkit-playsinline', 'true');
 interactionAudio.preload = 'auto';
 interactionAudio.load();
-cardMoveAudio.preload = 'auto';
-cardMoveAudio.load();
+class AudioPool {
+    constructor(src, poolSize = 8) {
+        this.pool = [];
+        this.currentIndex = 0;
+        
+        // Create multiple audio instances
+        for (let i = 0; i < poolSize; i++) {
+            const audio = new Audio(src);
+            audio.preload = 'auto';
+            audio.volume = 1.0;
+            
+            // Mobile optimizations
+            audio.setAttribute('playsinline', 'true');
+            audio.setAttribute('webkit-playsinline', 'true');
+            
+            // Load each instance
+            audio.load();
+            this.pool.push(audio);
+        }
+    }
+    
+    play() {
+        const audio = this.pool[this.currentIndex];
+        
+        // Use a more efficient approach for mobile
+        if (audio.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+            // Reset to beginning only if necessary
+            if (audio.currentTime > 0.1) {
+                audio.currentTime = 0;
+            }
+            
+            // Play the current audio instance
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.warn('Audio play failed:', error);
+                });
+            }
+        }
+        
+        // Move to next instance in pool
+        this.currentIndex = (this.currentIndex + 1) % this.pool.length;
+    }
+    
+    // Unlock all audio instances for mobile
+    unlockAll() {
+        this.pool.forEach(audio => {
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }).catch(() => {
+                    // Silently handle unlock failures
+                });
+            }
+        });
+    }
+}
+
+// Create audio pool for card move sounds
+const cardMoveAudioPool = new AudioPool('assets/CardMove.mp3', 8);
+
+// Preload interaction audio
+interactionAudio.preload = 'auto';
+interactionAudio.load();
 
 let audioUnlocked = false;
 function unlockAudio()
 {
     if (audioUnlocked) return;
     interactionAudio.play().catch(() => { });
-    cardMoveAudio.play().catch(() => { });
-    document.body.removeEventListener('touchstart', unlockAudio);
+    cardMoveAudioPool.unlockAll();
     audioUnlocked = true;
 }
+
+// Multiple event listeners for better mobile compatibility
 document.body.addEventListener('touchstart', unlockAudio, { once: true });
+document.body.addEventListener('click', unlockAudio, { once: true });
+window.addEventListener('focus', unlockAudio, { once: true });
+
+// Additional mobile audio context unlock
+document.addEventListener('DOMContentLoaded', () => {
+    // Force audio context unlock on load for some mobile browsers
+    setTimeout(unlockAudio, 100);
+});
 
 // Kart Türleri (Suits) - Dosya adlarıyla eşleşecek şekilde (örn: Spade01.png)
 const Suit = {
@@ -972,9 +1043,8 @@ class GameState
             if (deck.length > 0)
             {
                 const card = deck.pop();
-                // play card draw sound for each card
-                cardMoveAudio.currentTime = 0;
-                cardMoveAudio.play().catch(() => { });
+                // play card draw sound for each card using audio pool
+                cardMoveAudioPool.play();
                 // Her kartın animasyonını tamamlanmasını bekle
                 await new Promise(resolve =>
                 {
@@ -1222,9 +1292,8 @@ function playCard(cardView, player)
 {
     // Remove the playable card hand hint as soon as the card is played
     removeCardHandHint();
-    // play card movement sound
-    cardMoveAudio.currentTime = 0;
-    cardMoveAudio.play().catch(() => { });
+    // play card movement sound using audio pool
+    cardMoveAudioPool.play();
     // Remove card from player's hand
     const cardIndex = player.cards.indexOf(cardView);
     if (cardIndex > -1)
@@ -1327,9 +1396,8 @@ function handleAITurn()
                 if (deck.length > 0)
                 {
                     const drawnCard = deck.pop();
-                    // play draw card sound for AI
-                    cardMoveAudio.currentTime = 0;
-                    cardMoveAudio.play().catch(() => { });
+                    // play draw card sound for AI using audio pool
+                    cardMoveAudioPool.play();
                     currentPlayer.addCard(drawnCard);
 
                     // Check if drawn card can be played
@@ -1487,9 +1555,8 @@ function animateInvalidMove(cardView)
 // Deck tıklama işleyicisi
 function handleDeckClick(currentPlayer)
 {
-    // play draw card sound
-    cardMoveAudio.currentTime = 0;
-    cardMoveAudio.play().catch(() => { });
+    // play draw card sound using audio pool
+    cardMoveAudioPool.play();
     if (currentPlayer.isRealPlayer && gameState.isGameActive)
     {
         // El işaretlerini kaldır
