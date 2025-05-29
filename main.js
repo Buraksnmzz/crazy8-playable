@@ -2169,6 +2169,9 @@ function repositionInitialPlayButton()
 // Create end game screen with EndCard and PlayButton
 function showEndScreen()
 {
+    // Hide the initial play button first
+    hideInitialPlayButton();
+
     // Create overlay
     const overlay = document.createElement('div');
     overlay.className = 'game-overlay';
