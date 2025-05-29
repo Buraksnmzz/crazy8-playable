@@ -635,6 +635,10 @@ let cardHandSprite = null;
 let cardHandAnimation = null;
 let isCardHintActive = false;
 
+// PlayButton için değişkenler
+let playButton = null;
+let playButtonAnimation = null;
+
 // Oyuncu pozisyonlarını güncelle
 function updatePlayerPositions()
 {
@@ -1221,6 +1225,9 @@ class GameState
 const gameState = new GameState();
 gameState.pileTopCard = pileCard; // Set initial pile card
 
+// Show initial PlayButton
+showInitialPlayButton();
+
 // Oyun başlangıcında hint kontrolü yap
 checkPlayerTurnAndHint();
 
@@ -1765,6 +1772,39 @@ window.addEventListener('click', (event) =>
         return;
     }
 
+    // Handle initial PlayButton click (game hasn't started yet)
+    if (gameState.isGameActive && playButton)
+    {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(playButton);
+
+        if (intersects.length > 0)
+        {
+            // Hide initial PlayButton and start the game
+            hideInitialPlayButton();
+            // Audio unlock and start background music
+            audioManager.playBackgroundMusic();
+            return;
+        }
+    }
+
+    // Handle end screen PlayButton click (game has ended)
+    if (!gameState.isGameActive)
+    {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(playButton);
+
+        if (intersects.length > 0)
+        {
+            location.reload(); // Restart game
+            return;
+        }
+    }
+
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
@@ -1956,31 +1996,102 @@ function removeCardHandHint()
     isCardHintActive = false;
 }
 
+// PlayButton'u başlangıçta göster
+function showInitialPlayButton()
+{
+    const playButtonTexture = textureLoader.load(
+        'assets/PlayButton.png',
+        (texture) =>
+        {
+            const maxAni = renderer.capabilities.getMaxAnisotropy();
+            texture.anisotropy = maxAni;
+            texture.encoding = THREE.sRGBEncoding;
+            texture.minFilter = THREE.LinearMipMapLinearFilter;
+            texture.magFilter = THREE.LinearFilter;
+            texture.generateMipmaps = true;
+
+            const viewport = calculateViewportDimensions(camera);
+
+            // Compute aspect-ratio based button size
+            const img = texture.image;
+            const aspect = img.height / img.width;
+            const buttonWidth = viewport.width * 0.3; // 30% of viewport width
+            const buttonHeight = buttonWidth * aspect;
+
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                side: THREE.DoubleSide,
+                transparent: true,
+                alphaTest: 0.5
+            });
+
+            const geometry = new THREE.PlaneGeometry(buttonWidth, buttonHeight);
+            playButton = new THREE.Mesh(geometry, material);
+
+            // Position PlayButton at bottom center
+            playButton.position.set(0, -viewport.height * 0.3, 5);
+            scene.add(playButton);
+
+            // Start animation
+            animateInitialPlayButton();
+        },
+        undefined,
+        (error) => console.error('Initial PlayButton texture load error:', error)
+    );
+}
+
+// PlayButton animasyonu
+function animateInitialPlayButton()
+{
+    if (!playButton) return;
+
+    let scaleUp = true;
+    const minScale = 0.95;
+    const maxScale = 1.05;
+    const scaleSpeed = 0.001;
+
+    function animate()
+    {
+        if (gameState.isGameActive && playButton)
+        {
+            requestAnimationFrame(animate);
+
+            if (scaleUp)
+            {
+                playButton.scale.x += scaleSpeed;
+                playButton.scale.y += scaleSpeed;
+                if (playButton.scale.x >= maxScale) scaleUp = false;
+            } else
+            {
+                playButton.scale.x -= scaleSpeed;
+                playButton.scale.y -= scaleSpeed;
+                if (playButton.scale.x <= minScale) scaleUp = true;
+            }
+        }
+    }
+
+    playButtonAnimation = animate;
+    animate();
+}
+
+// PlayButton'u gizle
+function hideInitialPlayButton()
+{
+    if (playButton)
+    {
+        scene.remove(playButton);
+        playButton = null;
+    }
+
+    if (playButtonAnimation)
+    {
+        playButtonAnimation = null;
+    }
+}
+
 // Create end game screen with EndCard and PlayButton
 function showEndScreen()
 {
-    // Hide the play button when end screen appears
-    const playButtonElement = document.getElementById('playButton');
-    if (playButtonElement)
-    {
-        playButtonElement.classList.add('hidden');
-    }
-
-    // Create overlay for endgame screen
-    const endGameOverlay = document.createElement('div');
-    endGameOverlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.6);
-        z-index: -1;
-        pointer-events: none;
-    `;
-    endGameOverlay.id = 'endGameOverlay';
-    document.body.appendChild(endGameOverlay);
-
     // Play end card sound using SoundJS
     audioManager.playEndCardSound();
 
@@ -2123,28 +2234,7 @@ function showEndScreen()
 
     animatePlayButton();
 
-    // Add click handler for PlayButton
-    window.addEventListener('click', (event) =>
-    {
-        if (!gameState.isGameActive)
-        {
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObject(playButton);
-
-            if (intersects.length > 0)
-            {
-                // Remove the overlay before reloading
-                const overlay = document.getElementById('endGameOverlay');
-                if (overlay)
-                {
-                    overlay.remove();
-                }
-                location.reload(); // Restart game
-            }
-        }
-    });
+    // PlayButton click handler is already handled in the main window listener
 }
 
 // Preload end-screen images to avoid late loading on phones
