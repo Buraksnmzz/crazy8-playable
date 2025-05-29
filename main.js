@@ -1786,7 +1786,6 @@ window.addEventListener('click', (event) =>
         if (intersects.length > 0)
         {
             // Hide initial PlayButton and start the game
-            hideInitialPlayButton();
             // Audio unlock and start background music
             audioManager.playBackgroundMusic();
             return;
