@@ -834,8 +834,6 @@ class GameUI
     constructor()
     {
         this.turnIndicator = document.getElementById('turnIndicator');
-        this.gameMessage = document.getElementById('gameMessage');
-        this.winScreen = document.getElementById('winScreen');
     }
 
     updateTurnIndicator(playerIndex)
@@ -844,24 +842,6 @@ class GameUI
         this.turnIndicator.textContent = isRealPlayer ? "Your Turn" : `Player ${playerIndex + 1}'s Turn`;
         this.turnIndicator.style.background = isRealPlayer ? 'rgba(76, 175, 80, 0.9)' : 'rgba(255, 255, 255, 0.9)';
         this.turnIndicator.style.color = isRealPlayer ? '#fff' : '#333';
-    }
-
-    showMessage(message, duration = 2000)
-    {
-        this.gameMessage.textContent = message;
-        this.gameMessage.classList.add('show');
-
-        setTimeout(() =>
-        {
-            this.gameMessage.classList.remove('show');
-        }, duration);
-    }
-
-    showWinScreen(isWinner)
-    {
-        const message = isWinner ? "Congratulations! You Won!" : "Game Over!";
-        document.querySelector('.win-message h2').textContent = message;
-        this.winScreen.style.display = 'flex';
     }
 }
 
@@ -922,7 +902,6 @@ class GameState
             case Rank.Two:  // Draw Two stacking
                 this.drawTwoAmount += 2;
                 this.isDrawTwoActive = true;
-                gameUI.showMessage(`Draw stack is now ${this.drawTwoAmount}`);
                 // Normal turn rotation occurs at end of playCard function
                 break;
             case Rank.Ace:  // Change Direction
@@ -969,7 +948,6 @@ class GameState
                     {
                         cardView.updateEightCardTexture(maxSuit);
                     }
-                    gameUI.showMessage(`AI changed suit to ${maxSuit}!`);
                     // Handle turn change with delay for AI
                     setTimeout(() =>
                     {
@@ -1010,8 +988,6 @@ class GameState
 
         // Tüm kartlar eklendikten sonra pozisyonları tekrar düzenle
         player.arrangeCards();
-
-        gameUI.showMessage(`Player ${this.currentPlayerIndex + 1} drew ${this.drawTwoAmount} cards`);
 
         // reset
         this.drawTwoAmount = 0;
@@ -1192,7 +1168,6 @@ class SuitSelectionUI
         }
 
         this.hide();
-        gameUI.showMessage(`Suit changed to ${suitName}!`);
 
         // Add small delay before allowing interactions again
         setTimeout(() =>
@@ -1289,29 +1264,6 @@ function playCard(cardView, player)
     // Update game state
     gameState.pileTopCard = cardView;
 
-    // Show effect message based on card rank
-    switch (cardView.model.rank)
-    {
-        case Rank.Two:
-            gameUI.showMessage("Draw Two!");
-            break;
-        case Rank.Ace:
-            gameUI.showMessage("Direction Changed!");
-            break;
-        case Rank.Queen:
-            gameUI.showMessage("Skip Next Player!");
-            break;
-        case Rank.Eight:
-            if (player.isRealPlayer)
-            {
-                gameUI.showMessage("Choose a Suit!");
-            } else
-            {
-                gameUI.showMessage("AI Changed Suit!");
-            }
-            break;
-    }
-
     // Apply card effect and check if we should proceed with turn change
     // Eight card will return false to prevent immediate turn change
     const shouldAdvanceTurn = gameState.applyCardEffect(cardView);
@@ -1320,7 +1272,7 @@ function playCard(cardView, player)
     if (player.cards.length === 0)
     {
         gameState.isGameActive = false;
-        gameUI.showWinScreen(player.isRealPlayer);
+        showEndScreen();
         return;
     }
 
@@ -1379,7 +1331,6 @@ function handleAITurn()
                     cardMoveAudio.currentTime = 0;
                     cardMoveAudio.play().catch(() => { });
                     currentPlayer.addCard(drawnCard);
-                    gameUI.showMessage(`Player ${gameState.currentPlayerIndex + 1} drew a card`);
 
                     // Check if drawn card can be played
                     if (gameState.isCardPlayable(drawnCard))
@@ -1387,7 +1338,6 @@ function handleAITurn()
                         // AI always plays the drawn card if it can
                         setTimeout(() =>
                         {
-                            gameUI.showMessage(`Player ${gameState.currentPlayerIndex + 1} plays drawn card`);
                             playCard(drawnCard, currentPlayer);
                         }, 900); // Adjusted for new animation speed
                     } else
@@ -1532,9 +1482,6 @@ function animateInvalidMove(cardView)
             cardView.mesh.position.x = originalX;
         }, shakeDuration);
     }, shakeDuration);
-
-    // Show invalid move message
-    gameUI.showMessage("Invalid Move! Try another card.");
 }
 
 // Deck tıklama işleyicisi
@@ -1569,13 +1516,10 @@ function handleDeckClick(currentPlayer)
             {
                 const drawnCard = deck.pop();
                 currentPlayer.addCard(drawnCard);
-                gameUI.showMessage('Card Drawn');
 
                 // Check if drawn card can be played
                 if (gameState.isCardPlayable(drawnCard))
                 {
-                    gameUI.showMessage('You can play the drawn card!');
-
                     // Newly drawn card hint effect
                     setTimeout(() =>
                     {
