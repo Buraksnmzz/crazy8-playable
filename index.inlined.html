@@ -236,6 +236,7 @@ const encoded_audio = {
 
                 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
                 camera.position.z = 20; // Kamerayı daha da uzağa aldık
+                camera.lookAt(0, 0, 0);
                 const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
                 renderer.setPixelRatio(window.devicePixelRatio);
                 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -243,47 +244,6 @@ const encoded_audio = {
                 renderer.sortObjects = false; // renderOrder değerlerinin tam olarak uygulanması için
                 document.body.appendChild(renderer.domElement);
 
-                // DEBUG: Test kartı ekle - Daha detaylı debug bilgileri ile
-
-                console.log('Creating test card...');
-                const testGeometry = new THREE.PlaneGeometry(6, 8);
-                console.log('Test geometry created:', testGeometry);
-
-                const testMaterial = new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
-                    side: THREE.DoubleSide,
-                    transparent: false,
-                    opacity: 1
-                });
-                console.log('Test material created:', testMaterial);
-
-                const testCard = new THREE.Mesh(testGeometry, testMaterial);
-                testCard.position.set(0, 0, 0);
-                testCard.renderOrder = 9999;
-
-                // Material'ın doğru atandığından emin ol
-                console.log('Test card mesh:', testCard);
-                console.log('Test card material:', testCard.material);
-                console.log('Test card position:', testCard.position);
-
-                scene.add(testCard);
-                console.log('Test card added to scene');
-                console.log('Scene children count:', scene.children.length);
-                console.log('Camera position:', camera.position);
-                console.log('Camera looking at:', camera.getWorldDirection(new THREE.Vector3()));
-
-                const viewport = calculateViewportDimensions(camera);
-                console.log('Viewport dimensions:', viewport);
-
-                // Kameranın frustum'unu kontrol et
-                console.log('Camera near:', camera.near);
-                console.log('Camera far:', camera.far);
-                console.log('Camera FOV:', camera.fov);
-
-                // Renderer durumunu kontrol et
-                console.log('Renderer size:', renderer.getSize(new THREE.Vector2()));
-                console.log('Pixel ratio:', renderer.getPixelRatio());
-                // ...existing code...
 
                 // SoundJS Audio Manager
                 // class AudioManager
@@ -1150,68 +1110,17 @@ const encoded_audio = {
                     card.mesh.renderOrder = gameConfig.renderOrders.deck + index;
                 });
 
-                // ...existing code...
-                // ...existing code...
+               
 
-                // DEBUG: Test kartı ekle - Daha detaylı debug bilgileri ile
-
-                // console.log('Creating test card...');
-                // const testGeometry = new THREE.PlaneGeometry(6, 8);
-                // console.log('Test geometry created:', testGeometry);
-
-                // const testMaterial = new THREE.MeshBasicMaterial({
-                //     color: 0xff0000,
-                //     side: THREE.DoubleSide,
-                //     transparent: false,
-                //     opacity: 1
-                // });
-                // console.log('Test material created:', testMaterial);
-
-                // const testCard = new THREE.Mesh(testGeometry, testMaterial);
-                // testCard.position.set(0, 0, 0);
-                // testCard.renderOrder = 9999;
-
-                // // Material'ın doğru atandığından emin ol
-                // console.log('Test card mesh:', testCard);
-                // console.log('Test card material:', testCard.material);
-                // console.log('Test card position:', testCard.position);
-
-                // scene.add(testCard);
-                // console.log('Test card added to scene');
-                // console.log('Scene children count:', scene.children.length);
-                // console.log('Camera position:', camera.position);
-                // console.log('Camera looking at:', camera.getWorldDirection(new THREE.Vector3()));
-
-                // const viewport = calculateViewportDimensions(camera);
-                // console.log('Viewport dimensions:', viewport);
-
-                // // Kameranın frustum'unu kontrol et
-                // console.log('Camera near:', camera.near);
-                // console.log('Camera far:', camera.far);
-                // console.log('Camera FOV:', camera.fov);
-
-                // // Renderer durumunu kontrol et
-                // console.log('Renderer size:', renderer.getSize(new THREE.Vector2()));
-                // console.log('Pixel ratio:', renderer.getPixelRatio());
-                // ...existing code...
-            
-
-                // Örnek: Destenin ilk kartının ön yüzünü 1 saniye sonra göster
-                if (deck.length > 0)
-                {
-                    setTimeout(() =>
-                    {
-                        // deck[0].showFront(); // Test için bir kartın ön yüzünü göster
-                    }, 1000);
-                }
-
-
-                // Animasyon Döngüsü
+                
                 function animate()
                 {
                     requestAnimationFrame(animate);
                     renderer.render(scene, camera);
                 }
+                animate();
+
+
 
                 // Pencere yeniden boyutlandırma
                 window.addEventListener('resize', () =>
@@ -2793,60 +2702,6 @@ const encoded_audio = {
                 // Herhangi bir kodun adStarted'dan önce çalışmasını önle
 
             }) ()
-        // Kart görsellerinin yüklenme mantığını asset klasörü yerine encoded_images.js içindeki base64 string'leri kullanacak şekilde değiştirdim.
-        // function _loadTextures() {
-        //     // Kart görsel anahtarı: örn. Club02, Heart13
-        //     const rankString = this.model.rank < 10 ? `0${this.model.rank}` : `${this.model.rank}`;
-        //     const cardKey = `${this.model.suit}${rankString}`;
-        //     const backKey = 'backcard';
-
-        //     // Base64 string'den data URL oluştur
-        //     const frontBase64 = (typeof BASE64_IMAGES !== 'undefined' && BASE64_IMAGES[cardKey]) ? BASE64_IMAGES[cardKey] : null;
-        //     const backBase64 = (typeof BASE64_IMAGES !== 'undefined' && BASE64_IMAGES[backKey]) ? BASE64_IMAGES[backKey] : null;
-
-        //     const frontDataUrl = frontBase64 ? `data:image/png;base64,${frontBase64}` : '';
-        //     const backDataUrl = backBase64 ? `data:image/png;base64,${backBase64}` : '';
-
-        //     this.frontMaterial = new THREE.MeshBasicMaterial({
-        //         map: textureLoader.load(frontDataUrl,
-        //             (texture) => {
-        //                 const maxAni = renderer.capabilities.getMaxAnisotropy();
-        //                 texture.anisotropy = maxAni;
-        //                 texture.encoding = THREE.sRGBEncoding;
-        //                 texture.minFilter = THREE.LinearMipMapLinearFilter;
-        //                 texture.magFilter = THREE.LinearFilter;
-        //                 texture.generateMipmaps = true;
-        //                 if (this.isFaceUp && this.mesh) this.mesh.material = this.frontMaterial;
-        //             },
-        //             undefined,
-        //             (error) => console.error(`Doku yükleme hatası ${cardKey}:`, error)
-        //         ),
-        //         side: THREE.DoubleSide,
-        //         transparent: true,
-        //         opacity: 1,
-        //         alphaTest: 0.5
-        //     });
-
-        //     this.backMaterial = new THREE.MeshBasicMaterial({
-        //         map: textureLoader.load(backDataUrl,
-        //             (texture) => {
-        //                 const maxAni = renderer.capabilities.getMaxAnisotropy();
-        //                 texture.anisotropy = maxAni;
-        //                 texture.encoding = THREE.sRGBEncoding;
-        //                 texture.minFilter = THREE.LinearMipMapLinearFilter;
-        //                 texture.magFilter = THREE.LinearFilter;
-        //                 texture.generateMipmaps = true;
-        //                 if (!this.isFaceUp && this.mesh) this.mesh.material = this.backMaterial;
-        //             },
-        //             undefined,
-        //             (error) => console.error(`Doku yükleme hatası ${backKey}:`, error)
-        //         ),
-        //         side: THREE.DoubleSide,
-        //         transparent: true,
-        //         opacity: 1,
-        //         alphaTest: 0.5
-        //     });
-        // }
     </script>
 </body>
 
