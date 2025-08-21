@@ -247,21 +247,30 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                         };
                         this.sounds.backgroundMusic.loop = true;
                         this.masterVolume = 1.0;
-                        this.isMuted = false;
+                        // Separate mute sources so we can respect both
+                        this.userMuted = false;   // toggled via in-ad UI or logic
+                        this.systemMuted = false; // controlled by host/MRAID or device
+                        this.wasPlayingBeforeHide = false; // to resume on unlock/visibility
+                        this.hasUserInteracted = false; // becomes true after first user gesture
                     }
 
                     playBackgroundMusic()
                     {
-                        if (this.isMuted) return;
+                        if (this.isEffectivelyMuted()) return;
                         const audio = this.sounds.backgroundMusic;
                         audio.volume = 0.6 * this.masterVolume;
-                        audio.currentTime = 0;
-                        audio.play();
+                        // Only start if not already playing
+                        if (audio.paused)
+                        {
+                            // Don't reset currentTime; we want seamless resume on unlock
+                            audio.play().catch(() => { /* ignore autoplay errors until user gesture */ });
+                        }
                     }
 
                     playCardMove()
                     {
-                        if (this.isMuted) return;
+                        if (window.isGamePaused) return;
+                        if (this.isEffectivelyMuted()) return;
                         const audio = this.sounds.cardMove;
                         audio.volume = (0.7 + Math.random() * 0.3) * this.masterVolume;
                         audio.currentTime = 0;
@@ -270,7 +279,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
                     playEndCardSound()
                     {
-                        if (this.isMuted) return;
+                        if (window.isGamePaused) return;
+                        if (this.isEffectivelyMuted()) return;
                         const audio = this.sounds.endCardSound;
                         audio.volume = 0.8 * this.masterVolume;
                         audio.currentTime = 0;
@@ -280,14 +290,14 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     stopBackgroundMusic()
                     {
                         const audio = this.sounds.backgroundMusic;
+                        // Pause without resetting time to allow resume after unlock/unmute
                         audio.pause();
-                        audio.currentTime = 0;
                     }
 
                     setMasterVolume(volume)
                     {
                         this.masterVolume = Math.max(0, Math.min(1, volume));
-                        if (!this.isMuted)
+                        if (!this.isEffectivelyMuted())
                         {
                             this.sounds.backgroundMusic.volume = 0.6 * this.masterVolume;
                         }
@@ -295,20 +305,63 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
                     toggleMute()
                     {
-                        this.isMuted = !this.isMuted;
-                        if (this.isMuted)
+                        this.userMuted = !this.userMuted;
+                        if (this.userMuted)
                         {
                             this.stopBackgroundMusic();
                         } else
                         {
                             this.playBackgroundMusic();
                         }
-                        return this.isMuted;
+                        return this.userMuted;
                     }
 
                     preloadAll()
                     {
                         Object.values(this.sounds).forEach(audio => audio.load());
+                    }
+
+                    isEffectivelyMuted()
+                    {
+                        return this.userMuted || this.systemMuted || this.masterVolume === 0;
+                    }
+
+                    // System mute (e.g., MRAID audioVolumeChange -> 0)
+                    setSystemMuted(muted)
+                    {
+                        this.systemMuted = !!muted;
+                        if (this.systemMuted)
+                        {
+                            // Remember if bgm was playing to resume later
+                            this.wasPlayingBeforeHide = !this.sounds.backgroundMusic.paused;
+                            this.stopBackgroundMusic();
+                        }
+                        else
+                        {
+                            // If audio was playing before OR we've already had a user gesture, resume bgm
+                            if ((this.wasPlayingBeforeHide || this.hasUserInteracted) && !this.userMuted)
+                            {
+                                this.playBackgroundMusic();
+                            }
+                        }
+                    }
+
+                    // Visibility/lock handling
+                    handleVisibilityChange(hidden)
+                    {
+                        if (hidden)
+                        {
+                            this.wasPlayingBeforeHide = !this.sounds.backgroundMusic.paused;
+                            this.stopBackgroundMusic();
+                        }
+                        else
+                        {
+                            // On unhide/focus, if user has previously interacted or bgm was playing, resume
+                            if ((this.wasPlayingBeforeHide || this.hasUserInteracted) && !this.isEffectivelyMuted())
+                            {
+                                this.playBackgroundMusic();
+                            }
+                        }
                     }
                 }
 
@@ -977,10 +1030,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                
 
                 
+
+                // Global oyun duraklatma flag'i
+                window.isGamePaused = false;
+
                 function animate()
                 {
+                    if (!window.isGamePaused) {
+                        renderer.render(scene, camera);
+                    }
                     requestAnimationFrame(animate);
-                    renderer.render(scene, camera);
                 }
                 animate();
 
@@ -1867,7 +1926,17 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
                         if (intersects.length > 0)
                         {
-                             mraid.open("https://edda.tr/crazy8Playable");
+                             //mraid.open("https://edda.tr/crazy8Playable");
+
+                            var url;
+                            if (/android/i.test(navigator.userAgent)) {
+                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
+                            } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                                url = "https://apps.apple.com/us/app/crazy-8-card-game/id6746338583";
+                            } else {
+                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
+                            }
+                            mraid.open(url);
                             return;
                         }
                     }
@@ -1882,7 +1951,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
                         if (intersects.length > 0)
                         {
-                            mraid.open("https://edda.tr/crazy8Playable");
+                            //mraid.open("https://edda.tr/crazy8Playable");
+                            var url;
+                            if (/android/i.test(navigator.userAgent)) {
+                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
+                            } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                                url = "https://apps.apple.com/us/app/crazy-8-card-game/id6746338583";
+                            } else {
+                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
+                            }
+                            mraid.open(url);
                             return;
                         }
                     }
@@ -2382,7 +2460,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
                         if (intersects.length > 0)
                         {
-                            mraid.open("https://edda.tr/crazy8Playable");
+                            //mraid.open("https://edda.tr/crazy8Playable");
+                            var url;
+                            if (/android/i.test(navigator.userAgent)) {
+                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
+                            } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                                url = "https://apps.apple.com/us/app/crazy-8-card-game/id6746338583";
+                            } else {
+                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
+                            }
+                            mraid.open(url);
                             return;
                         }
                     });
@@ -2483,6 +2570,26 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     mraidEnv.addEventListener('ready', onMraidReady);
                     mraidEnv.addEventListener('viewableChange', onViewableChange);
                     mraidEnv.addEventListener('stateChange', onStateChange);
+                    // Respect iOS mute switch via MRAID v3 audio volume if available
+                    try {
+                        var version = parseFloat(mraidEnv.getVersion && mraidEnv.getVersion());
+                        if (!isNaN(version) && version >= 3 && typeof mraidEnv.addEventListener === 'function' && typeof mraidEnv.getAudioVolume === 'function')
+                        {
+                            // Initialize from current volume
+                            var vol = mraidEnv.getAudioVolume();
+                            if (typeof vol === 'number')
+                            {
+                                audioManager.setSystemMuted(vol === 0);
+                            }
+                            mraidEnv.addEventListener('audioVolumeChange', function (volume)
+                            {
+                                // volume is 0..1 per MRAID 3 spec
+                                audioManager.setSystemMuted(volume === 0);
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('MRAID audio volume integration not available:', e);
+                    }
                 }
 
                 function onMraidReady()
@@ -2502,9 +2609,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     if (viewable)
                     {
                         // resume audio or animations
+                        window.isGamePaused = false;
+                        audioManager.handleVisibilityChange(false);
                     } else
                     {
                         // pause game
+                        window.isGamePaused = true;
+                        audioManager.handleVisibilityChange(true);
                     }
                 }
 
@@ -2520,7 +2631,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     }
                     else if(state === 'hidden')
                     {
-                        audioManager.stopBackgroundMusic();
+                        window.isGamePaused = true;
+                        audioManager.handleVisibilityChange(true);
                     }
                 }
 
@@ -2540,15 +2652,14 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     }
                 };
 
-                // When game ends, collapse MRAID if expanded
+                // When game ends, show end screen and keep expanded; user can close via custom close
                 var originalShowEndScreen = showEndScreen;
                 showEndScreen = function ()
                 {
                     originalShowEndScreen();
                     if (isMraid && mraidEnv.getState() === 'expanded')
                     {
-                        // leave expanded state for in-banner
-                        // user can click custom close
+                        // leave expanded state for in-banner; user can click custom close
                     }
                 };
 
@@ -2578,8 +2689,30 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                 // İlk kullanıcı etkileşimiyle sesi aç ve müziği başlat
                 document.body.addEventListener('click', function onFirstClick()
                 {
-                    //audioManager.setupMobileAudioUnlock();
+                    // Unlock audio on first gesture; don't force playback if user muted/system muted
+                    audioManager.hasUserInteracted = true;
+                    audioManager.playBackgroundMusic();
                     document.body.removeEventListener('click', onFirstClick);
+                });
+
+                // Pause management + Page Visibility API: stop/resume audio and pause game on lock/unlock and tab switching
+                function setGamePaused(paused) {
+                    window.isGamePaused = !!paused;
+                }
+                function handleDocVisibility() {
+                    const hidden = document.hidden;
+                    setGamePaused(hidden);
+                    audioManager.handleVisibilityChange(hidden);
+                }
+                document.addEventListener('visibilitychange', handleDocVisibility);
+                // iOS specific older event
+                document.addEventListener('webkitvisibilitychange', handleDocVisibility);
+                window.addEventListener('pagehide', () => { setGamePaused(true); audioManager.handleVisibilityChange(true); });
+                window.addEventListener('pageshow', () => { setGamePaused(false); audioManager.handleVisibilityChange(false); });
+                window.addEventListener('blur', () => { setGamePaused(true); audioManager.handleVisibilityChange(true); });
+                window.addEventListener('focus', () => {
+                    setGamePaused(false);
+                    audioManager.handleVisibilityChange(false);
                 });
 
                 // Herhangi bir kodun adStarted'dan önce çalışmasını önle
