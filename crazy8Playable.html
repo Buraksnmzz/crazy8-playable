@@ -2581,11 +2581,15 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                             {
                                 audioManager.setSystemMuted(vol === 0);
                             }
-                            mraidEnv.addEventListener('audioVolumeChange', function (volume)
+                            if (!window.__audioVolListenerBound)
                             {
-                                // volume is 0..1 per MRAID 3 spec
-                                audioManager.setSystemMuted(volume === 0);
-                            });
+                                mraidEnv.addEventListener('audioVolumeChange', function (volume)
+                                {
+                                    // volume is 0..1 per MRAID 3 spec
+                                    audioManager.setSystemMuted(Number(volume) === 0);
+                                });
+                                window.__audioVolListenerBound = true;
+                            }
                         }
                     } catch (e) {
                         console.warn('MRAID audio volume integration not available:', e);
@@ -2601,6 +2605,27 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     // show close button when expanded
                     closeButton.style.display = 'none';
                     closeButton.addEventListener('click', function () { mraidEnv.close(); });
+
+                    // Re-sync system mute at ready in case init ran before SDK was ready
+                    try {
+                        var version = parseFloat(mraidEnv.getVersion && mraidEnv.getVersion());
+                        if (!isNaN(version) && version >= 3 && typeof mraidEnv.getAudioVolume === 'function')
+                        {
+                            var vol = mraidEnv.getAudioVolume();
+                            if (typeof vol === 'number')
+                            {
+                                audioManager.setSystemMuted(vol === 0);
+                            }
+                            if (!window.__audioVolListenerBound && typeof mraidEnv.addEventListener === 'function')
+                            {
+                                mraidEnv.addEventListener('audioVolumeChange', function (volume)
+                                {
+                                    audioManager.setSystemMuted(Number(volume) === 0);
+                                });
+                                window.__audioVolListenerBound = true;
+                            }
+                        }
+                    } catch (_) { /* ignore */ }
                 }
 
                 function onViewableChange(viewable)
