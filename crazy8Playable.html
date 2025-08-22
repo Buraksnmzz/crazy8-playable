@@ -1482,14 +1482,18 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     {
                         this.isVisible = true;
                         this.overlay.style.display = 'block';
+                        this.overlay.style.pointerEvents = 'auto';
                         this.container.style.display = 'block';
+                        this.container.style.pointerEvents = 'auto';
                     }
 
                     hide()
                     {
                         this.isVisible = false;
                         this.overlay.style.display = 'none';
+                        this.overlay.style.pointerEvents = 'none';
                         this.container.style.display = 'none';
+                        this.container.style.pointerEvents = 'none';
                     }
 
                     handleSuitSelection(suitName)
@@ -1534,8 +1538,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                 // Event handler for card selection
                 function handleCardClick(cardView)
                 {
-                    // play interaction sound using SoundJS
-                    audioManager.playBackgroundMusic();
+                    // Background music is unlocked on first user gesture; avoid redundant play calls here
 
                     const currentPlayer = players[gameState.currentPlayerIndex];
 
@@ -1906,9 +1909,11 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     }
                 }
 
-                // Update click handler to use new game logic and handle deck draws
-                window.addEventListener('click', (event) =>
-                {
+                // Unified pointer handler on canvas (more reliable inside ad containers than window click)
+                function onPointerDown(event) {
+                    // Improve reliability in webview wrappers
+                    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+
                     // Block interactions when suit selection popup is visible
                     if (suitSelectionUI.isVisible)
                     {
@@ -1916,57 +1921,55 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                         return;
                     }
 
+                    // Compute NDC from canvas-relative pointer coordinates
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    const clientX = (event.touches && event.touches.length) ? event.touches[0].clientX : event.clientX;
+                    const clientY = (event.touches && event.touches.length) ? event.touches[0].clientY : event.clientY;
+                    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+                    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
                     // Handle initial PlayButton click (game hasn't started yet)
                     if (gameState.isGameActive && playButton)
                     {
-                        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
                         raycaster.setFromCamera(mouse, camera);
-                        const intersects = raycaster.intersectObject(playButton);
-
-                        if (intersects.length > 0)
+                        const intersectsStart = raycaster.intersectObject(playButton);
+                        if (intersectsStart.length > 0)
                         {
-                             //mraid.open("https://edda.tr/crazy8Playable");
-
                             var url;
                             if (/android/i.test(navigator.userAgent)) {
                                 url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
                             } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                url = "https://apps.apple.com/us/app/crazy-8-card-game/id6746338583";
+                                // Use itms-apps to satisfy iOS store validators
+                                url = "itms-apps://itunes.apple.com/app/id6746338583";
                             } else {
                                 url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
                             }
-                            mraid.open(url);
+                            if (window.mraid && typeof mraid.open === 'function') { mraid.open(url); } else { window.open(url, '_blank'); }
                             return;
                         }
                     }
 
-                    // Handle end screen PlayButton click (game has ended)
+                    // Handle end screen tap (game has ended): open store if user taps PlayButton or anywhere on EndCard
                     if (!gameState.isGameActive)
                     {
-                        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
                         raycaster.setFromCamera(mouse, camera);
-                        const intersects = raycaster.intersectObject(playButton);
-
-                        if (intersects.length > 0)
+                        const hitEndBtn = playButton ? raycaster.intersectObject(playButton).length > 0 : false;
+                        const endCardMesh = window.__endCardMesh;
+                        const hitEndCard = endCardMesh ? raycaster.intersectObject(endCardMesh).length > 0 : false;
+                        if (hitEndBtn || hitEndCard)
                         {
-                            //mraid.open("https://edda.tr/crazy8Playable");
                             var url;
                             if (/android/i.test(navigator.userAgent)) {
                                 url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
                             } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                url = "https://apps.apple.com/us/app/crazy-8-card-game/id6746338583";
+                                url = "itms-apps://itunes.apple.com/app/id6746338583";
                             } else {
                                 url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
                             }
-                            mraid.open(url);
+                            if (window.mraid && typeof mraid.open === 'function') { mraid.open(url); } else { window.open(url, '_blank'); }
                             return;
                         }
                     }
-
-                    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
                     raycaster.setFromCamera(mouse, camera);
                     const intersects = raycaster.intersectObjects(scene.children, true);
@@ -1992,7 +1995,12 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                             handleCardClick(clickedCard);
                         }
                     }
-                });
+                }
+
+                // Bind pointer handler to the actual canvas for robust input inside ad wrappers
+                renderer.domElement.style.pointerEvents = 'auto';
+                renderer.domElement.style.touchAction = 'manipulation';
+                renderer.domElement.addEventListener('pointerdown', onPointerDown, { passive: false });
 
                 // El işaretini oluştur ve göster
                 function createDeckHandHint()
@@ -2380,6 +2388,8 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 
                     const endCardGeometry = new THREE.PlaneGeometry(targetWidth, targetHeight);
                     const endCard = new THREE.Mesh(endCardGeometry, endCardMaterial);
+                    // Expose globally for pointer hit-testing
+                    window.__endCardMesh = endCard;
                     endCard.position.set(0, 0, 10);  // Center end card on screen
 
                     // Start with scale 0 for popup animation
@@ -2451,28 +2461,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                         (error) => console.error('PlayButton texture load error:', error)
                     );
 
-                    window.addEventListener('click', (e) => 
-                    {
-                        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-                        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                        raycaster.setFromCamera(mouse, camera);
-                        const intersects = raycaster.intersectObject(endCard);
-
-                        if (intersects.length > 0)
-                        {
-                            //mraid.open("https://edda.tr/crazy8Playable");
-                            var url;
-                            if (/android/i.test(navigator.userAgent)) {
-                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
-                            } else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                                url = "https://apps.apple.com/us/app/crazy-8-card-game/id6746338583";
-                            } else {
-                                url = "https://play.google.com/store/apps/details?id=com.yoogalabgaming.crazy8.cards";
-                            }
-                            mraid.open(url);
-                            return;
-                        }
-                    });
+                    // Click handling for end screen is consolidated in the unified canvas pointer handler
 
                     // Animate PlayButton
                     let scaleUp = true;
@@ -2665,18 +2654,14 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                 // Call MRAID init
                 initMRAID();
 
-                // Override showInitialPlayButton to expand MRAID before starting
+                // Use custom close in expanded state to avoid SDK default close overlay stealing touches
+                if (isMraid && typeof mraidEnv.useCustomClose === 'function') {
+                    try { mraidEnv.useCustomClose(true); } catch (_) {}
+                }
+
+                // Do NOT auto-expand; expand on first user gesture (see first-click handler below)
                 var originalShowInitialPlayButton = showInitialPlayButton;
-                showInitialPlayButton = function ()
-                {
-                    if (isMraid && mraidEnv.getState() === 'default')
-                    {
-                        mraidEnv.expand();
-                    } else
-                    {
-                        originalShowInitialPlayButton();
-                    }
-                };
+                showInitialPlayButton = function () { originalShowInitialPlayButton(); };
 
                 // When game ends, show end screen and keep expanded; user can close via custom close
                 var originalShowEndScreen = showEndScreen;
@@ -2718,6 +2703,13 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
                     // Unlock audio on first gesture; don't force playback if user muted/system muted
                     audioManager.hasUserInteracted = true;
                     audioManager.playBackgroundMusic();
+                    // Expand on first gesture if using MRAID default state
+                    try {
+                        if (isMraid && typeof mraid !== 'undefined' && mraid.getState && mraid.getState() === 'default') {
+                            if (typeof mraid.useCustomClose === 'function') mraid.useCustomClose(true);
+                            if (typeof mraid.expand === 'function') mraid.expand();
+                        }
+                    } catch (_) {}
                     document.body.removeEventListener('click', onFirstClick);
                 });
 
